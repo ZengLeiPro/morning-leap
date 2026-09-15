@@ -112,18 +112,18 @@
     let spawnInterval = 1.55; // seconds between pipes
 
     if (t < 3) {
-      gapH = 170;
-      speed = PIPE_SPEED_BASE * 0.72;
-      spawnInterval = 1.85;
+      gapH = 178;
+      speed = PIPE_SPEED_BASE * 0.68;
+      spawnInterval = 1.95;
     } else if (t < 10) {
       const k = (t - 3) / 7;
-      gapH = 170 - k * 20; // 170 → 150
-      speed = PIPE_SPEED_BASE * (0.72 + k * 0.28);
-      spawnInterval = 1.85 - k * 0.3;
+      gapH = 178 - k * 28; // 178 → 150
+      speed = PIPE_SPEED_BASE * (0.68 + k * 0.32);
+      spawnInterval = 1.95 - k * 0.4;
     } else {
       const k = Math.min(1, (t - 10) / 40);
       gapH = Math.max(GAP_FLOOR, GAP_DEFAULT - k * 30); // 150 → 120
-      speed = PIPE_SPEED_BASE * (1 + k * 0.35); // up to ~-4.05
+      speed = PIPE_SPEED_BASE * (1 + k * 0.28); // soft cap ~-3.84
       spawnInterval = Math.max(1.15, 1.55 - k * 0.4);
     }
     return { gapH, speed, spawnInterval };
@@ -459,7 +459,7 @@
     playTime = 0;
     deathTimer = 0;
     scorePopT = 0;
-    spawnTimer = 0.6; // first pipe soon
+    spawnTimer = 2.8; // GDD: first pair ~2.5–3.5s
     bean.x = W / 3;
     bean.y = H / 2;
     bean.vy = 0;
@@ -513,11 +513,15 @@
   }
 
   // ─── Input ──────────────────────────────────────────────────────────────
+  let lastTouchAt = 0; // suppress ghost mouse after touch
+
   function canvasToLogical(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
+    const rw = Math.max(1, rect.width);
+    const rh = Math.max(1, rect.height);
     return {
-      x: ((clientX - rect.left) / rect.width) * W,
-      y: ((clientY - rect.top) / rect.height) * H,
+      x: ((clientX - rect.left) / rw) * W,
+      y: ((clientY - rect.top) / rh) * H,
     };
   }
 
@@ -525,10 +529,8 @@
     return p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h;
   }
 
-  function onPointerDown(e) {
-    e.preventDefault();
-    const t = e.changedTouches ? e.changedTouches[0] : e;
-    const p = canvasToLogical(t.clientX, t.clientY);
+  function handlePress(clientX, clientY) {
+    const p = canvasToLogical(clientX, clientY);
 
     if (state === STATE.TITLE) {
       const r = primaryBtnRect();
@@ -538,18 +540,28 @@
     }
     if (state === STATE.GAMEOVER) {
       const r = gameOverBtnRect();
-      if (hitBtn(p, r)) {
-        btnPressed = true;
-        flap();
-      } else if (hitBtn(p, { x: 0, y: 0, w: W, h: H })) {
-        // allow tap anywhere on panel area to restart too
-        flap();
-      }
+      if (hitBtn(p, r)) btnPressed = true;
+      // tap anywhere / Space-equivalent: restart
+      flap();
       return;
     }
     if (state === STATE.PLAYING) {
       flap();
     }
+  }
+
+  function onTouchStart(e) {
+    e.preventDefault();
+    lastTouchAt = performance.now();
+    const t = e.changedTouches[0];
+    if (t) handlePress(t.clientX, t.clientY);
+  }
+
+  function onMouseDown(e) {
+    // Ignore synthetic click ~300ms after touch
+    if (performance.now() - lastTouchAt < 350) return;
+    e.preventDefault();
+    handlePress(e.clientX, e.clientY);
   }
 
   function onPointerUp(e) {
@@ -559,21 +571,29 @@
   function onKeyDown(e) {
     if (e.code === "Space" || e.key === " " || e.key === "Spacebar") {
       e.preventDefault();
-      if (e.repeat) return; // rapid but ignore key-repeat spam as continuous flaps is ok... actually allow flaps
+      if (e.repeat) return; // one flap per physical press
       flap();
     }
   }
 
-  canvas.addEventListener("mousedown", onPointerDown);
+  canvas.addEventListener("mousedown", onMouseDown);
   canvas.addEventListener("mouseup", onPointerUp);
   canvas.addEventListener("mouseleave", onPointerUp);
-  canvas.addEventListener("touchstart", onPointerDown, { passive: false });
+  canvas.addEventListener("touchstart", onTouchStart, { passive: false });
   canvas.addEventListener("touchend", onPointerUp, { passive: false });
+  canvas.addEventListener("touchcancel", onPointerUp, { passive: false });
   window.addEventListener("keydown", onKeyDown);
 
-  // Prevent page scroll / bounce
+  // Prevent page scroll / bounce on mobile
   document.addEventListener(
     "touchmove",
+    function (e) {
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+  window.addEventListener(
+    "gesturestart",
     function (e) {
       e.preventDefault();
     },
