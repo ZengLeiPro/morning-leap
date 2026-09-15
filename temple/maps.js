@@ -89,10 +89,9 @@
         { id: "vg4", x: 23 * T + 8, y: 22 * T + 8 },
         { id: "vg5", x: 25 * T + 8, y: 22 * T + 8 },
       ],
+      // PM: only 1 slime; SW of plaza — east road to merchant stays clear
       enemies: [
-        { type: "slime", x: 24 * T + 8, y: 10 * T + 8 },
-        { type: "slime", x: 28 * T + 8, y: 18 * T + 8 },
-        { type: "slime", x: 14 * T + 8, y: 20 * T + 8 },
+        { type: "slime", x: 14 * T + 8, y: 20 * T + 8, slow: true },
       ],
       signs: [
         { x: 22 * T + 8, y: 12 * T + 8, text: "北：晨光神殿　东：钥匙商人" },
@@ -158,7 +157,7 @@
         spawnAt: { x: 20 * T + 8, y: 5 * T + 8 },
       },
     ],
-    enemies: [{ type: "slime", x: 10 * T + 8, y: 6 * T + 8 }],
+    enemies: [{ type: "slime", x: 10 * T + 8, y: 6 * T + 8, slow: true }],
     signs: [
       { x: 6 * T + 8, y: 5 * T + 8, text: "唯持钥者，得见残阳。", story: "stele" },
     ],

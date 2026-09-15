@@ -462,7 +462,7 @@
     ctx.restore();
   }
 
-  function drawHUD(ctx, hearts, maxHearts, keys, coins, quest) {
+  function drawHUD(ctx, hearts, maxHearts, keys, bossKeys, coins, quest) {
     // hearts
     for (let i = 0; i < maxHearts; i++) {
       const full = hearts >= i + 1 || (hearts > i && hearts < i + 1); // half?
@@ -481,7 +481,7 @@
         drawHeart(ctx, 8 + i * 12, 6, false);
       }
     }
-    // keys
+    // temple key (orange) + boss key (cream/stone) separately
     ctx.fillStyle = COLORS.orange;
     ctx.fillRect(8, 20, 3, 6);
     ctx.beginPath();
@@ -489,7 +489,20 @@
     ctx.fill();
     ctx.fillStyle = COLORS.cream;
     ctx.font = "12px sans-serif";
-    ctx.fillText("×" + keys, 16, 26);
+    ctx.fillText("×" + (keys | 0), 16, 26);
+    // boss key
+    ctx.fillStyle = COLORS.cream;
+    ctx.fillRect(48, 20, 3, 6);
+    ctx.beginPath();
+    ctx.arc(49.5, 18, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = COLORS.orange;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(49.5, 18, 2.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = COLORS.cream;
+    ctx.fillText("×" + (bossKeys | 0), 56, 26);
     // coins
     ctx.fillStyle = COLORS.orange;
     ctx.beginPath();

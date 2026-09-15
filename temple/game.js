@@ -121,6 +121,7 @@
     player.keys = data.keys || 0;
     player.bossKeys = data.bossKeys || 0;
     flags = data.flags || {};
+    if (!flags.cleared || typeof flags.cleared !== "object") flags.cleared = {};
     openedChests = data.chests || {};
     takenPickups = data.pickups || {};
     hasSword = !!data.hasSword || !!flags.metElder;
@@ -132,7 +133,7 @@
   function newGame() {
     try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
     player = defaultPlayer();
-    flags = {};
+    flags = { cleared: {} };
     openedChests = {};
     takenPickups = {};
     hasSword = false;
@@ -222,10 +223,15 @@
   }
 
   function spawnEnemy(e) {
+    // 3s spawn invulnerability before contact damage (village soft landing)
+    const spawnInvuln = 3000;
     if (e.type === "slime") {
+      // village/T1 (slow:true) chase much slower; others keep base speed
+      const speed = e.slow ? 18 : 40;
       return {
-        type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: 40,
+        type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed,
         x: e.x, y: e.y, flash: 0, squash: 0, stun: 0, dead: false, knock: { x: 0, y: 0 },
+        spawnInvuln,
       };
     }
     if (e.type === "stone") {
@@ -233,6 +239,7 @@
         type: "stone", hp: 3, maxHp: 3, dmg: 1, speed: 28,
         x: e.x, y: e.y, flash: 0, stun: 0, dead: false, knock: { x: 0, y: 0 },
         patrolDir: 1, patrolAcc: 0,
+        spawnInvuln,
       };
     }
     return spawnBoss(e);
@@ -269,11 +276,30 @@
     return enemies.every((e) => e.dead || e.hp <= 0);
   }
 
+  function ensureClearedMap() {
+    if (!flags.cleared || typeof flags.cleared !== "object") flags.cleared = {};
+  }
+
+  function markRoomClearedIfDone() {
+    ensureClearedMap();
+    if (roomCleared()) flags.cleared[roomId] = true;
+  }
+
+  function isRoomPermanentlyCleared() {
+    ensureClearedMap();
+    return !!flags.cleared[roomId];
+  }
+
   function isDoorOpen(d) {
-    if (d.needKey) return !!flags.templeUnlocked || player.keys >= 1;
+    // Softlock: temple door requires sword first
+    if (d.needKey) {
+      if (!hasSword) return false;
+      return !!flags.templeUnlocked || player.keys >= 1;
+    }
     if (d.needBossKey) return !!flags.bossDoorOpen || player.bossKeys >= 1;
     if (d.needSwitchT3) return !!flags.switchT3; // north: switch ONLY
-    if (d.needClear) return roomCleared(); // west: clear ONLY
+    // Permanent clear flag — never re-block after clear even if enemies respawn
+    if (d.needClear) return isRoomPermanentlyCleared() || roomCleared();
     return true;
   }
 
@@ -364,8 +390,8 @@
     // knockback away from player
     const dx = e.x - player.x, dy = e.y - player.y;
     const len = Math.hypot(dx, dy) || 1;
-    e.knock.x = (dx / len) * 5;
-    e.knock.y = (dy / len) * 5;
+    e.knock.x = (dx / len) * 12;
+    e.knock.y = (dy / len) * 12;
     hitstop = HITSTOP_MS;
     if (e.hp <= 0) {
       e.dead = true;
@@ -377,6 +403,7 @@
         // optional gold drop (economy does not rely on it)
         golds.push({ id: "drop_" + Math.random().toString(36).slice(2), x: e.x, y: e.y, drop: true });
       }
+      markRoomClearedIfDone();
       updateDoorVisuals();
     }
   }
@@ -389,8 +416,8 @@
     if (from) {
       const dx = player.x - from.x, dy = player.y - from.y;
       const len = Math.hypot(dx, dy) || 1;
-      player.knock.x = (dx / len) * 6;
-      player.knock.y = (dy / len) * 6;
+      player.knock.x = (dx / len) * 14;
+      player.knock.y = (dy / len) * 14;
     }
     if (player.hp <= 0) {
       mode = MODE.DEAD;
@@ -496,7 +523,9 @@
       return;
     }
     if (n.id === "merchant") {
-      if (player.keys >= 1 || flags.boughtKey) {
+      if (!hasSword) {
+        showDialog("钥匙商人", ["先去找长老吧。", "他在村子西边，会给你一把钝剑。"]);
+      } else if (player.keys >= 1 || flags.boughtKey) {
         showDialog("钥匙商人", ["小心石头人——要砍好几下。", "草地上有五枚金币，记得捡。"]);
       } else if (player.gold >= 5) {
         showDialog("钥匙商人", ["神殿钥匙，五枚金币。成交？"], () => {
@@ -566,7 +595,10 @@
       if (!aabb(pb, db)) continue;
 
       if (!isDoorOpen(d)) {
-        if (!toast || toast.t < 200) showToast(d.lockedMsg || "门还锁着。");
+        let msg = d.lockedMsg || "门还锁着。";
+        if (d.needKey && !hasSword) msg = "先去找长老拿剑。";
+        else if (d.needKey && !(flags.templeUnlocked || player.keys >= 1)) msg = d.lockedMsg || "需要钥匙。";
+        if (!toast || toast.t < 200) showToast(msg);
         // nudge back
         if (d.y === 0) player.y += 2;
         else if (d.y >= room.h - 1) player.y -= 2;
@@ -783,6 +815,7 @@
         continue;
       }
       if (e.flash > 0) e.flash -= dt;
+      if (e.spawnInvuln > 0) e.spawnInvuln -= dt;
       if (e.stun > 0) { e.stun -= dt; continue; }
       if (e.knock.x || e.knock.y) {
         tryMove(e, e.knock.x, e.knock.y);
@@ -807,14 +840,17 @@
         updateBoss(e, dt);
       }
 
-      // contact damage
-      if (e.hp > 0) {
+      // contact damage (skip during spawn invulnerability)
+      if (e.hp > 0 && !(e.spawnInvuln > 0)) {
         const eb = enemyBox(e);
         if (aabb(footBox(player.x, player.y), eb)) {
           hurtPlayer(e.dmg, e);
         }
       }
     }
+
+    // permanent room-clear flag (doors stay open after clear)
+    if (enemies.length && roomCleared()) markRoomClearedIfDone();
 
     // door check
     tryDoor();
@@ -835,7 +871,7 @@
   }
 
   function updateBoss(e, dt) {
-    // phase transition
+    // phase transition — ground warning circle, then slime appears
     if (e.hp <= 4 && e.phase === 1) {
       e.phase = 2;
       e.phaseFlash = 600;
@@ -843,14 +879,23 @@
       showToast("残阳守卫进入第二阶段！");
       if (!e.summoned) {
         e.summoned = true;
-        enemies.push({
-          type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: 40,
-          x: e.x + 30, y: e.y, flash: 0, squash: 0, stun: 0, dead: false,
-          knock: { x: 0, y: 0 },
-        });
+        e.summonWarn = 900; // ground circle before slime
+        e.summonX = e.x + 30;
+        e.summonY = e.y;
       }
     }
     if (e.phaseFlash > 0) e.phaseFlash -= dt;
+    if (e.summonWarn > 0) {
+      e.summonWarn -= dt;
+      if (e.summonWarn <= 0) {
+        e.summonWarn = 0;
+        enemies.push({
+          type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: 40,
+          x: e.summonX, y: e.summonY, flash: 0, squash: 0, stun: 0, dead: false,
+          knock: { x: 0, y: 0 }, spawnInvuln: 500,
+        });
+      }
+    }
 
     if (e.telegraph > 0) {
       e.telegraph -= dt;
@@ -938,6 +983,22 @@
     for (const h of hearts) Art.drawHeartPickup(ctx, h.x, h.y, time);
     for (const k of groundKeys) Art.drawKey(ctx, k.x, k.y, Math.sin(time * 0.008) * 2);
 
+    // Boss P2 summon ground warning circle
+    for (const e of enemies) {
+      if (e.type === "boss" && e.summonWarn > 0) {
+        const pulse = 0.65 + 0.35 * Math.sin(time * 0.02);
+        ctx.save();
+        ctx.strokeStyle = "rgba(244,162,97," + (0.55 + 0.35 * pulse) + ")";
+        ctx.fillStyle = "rgba(244,162,97," + (0.18 * pulse) + ")";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(e.summonX, e.summonY + 4, 12 + pulse * 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     // sort entities by y
     const ents = [];
     for (const n of room.npcs || []) ents.push({ y: n.y, draw: () => Art.drawNpc(ctx, n.x, n.y, n.kind, n.flash && !flags.metElder) });
@@ -984,14 +1045,14 @@
       ctx.fillRect(0, 0, W, 48);
     }
 
-    // HUD
+    // HUD — temple key and boss key shown separately
     if (mode !== MODE.TITLE) {
-      const totalKeys = player.keys + player.bossKeys;
       Art.drawHUD(
         ctx,
         player.hp,
         player.maxHp,
-        totalKeys,
+        player.keys,
+        player.bossKeys,
         player.gold,
         questOn && !flags.ending ? "目标：取回晨光核" : ""
       );
@@ -1063,7 +1124,7 @@
     });
     ctx.font = "11px sans-serif";
     ctx.fillStyle = "rgba(42,31,26,0.7)";
-    ctx.fillText("WASD/方向移动 · J/Z/空格挥剑 · E对话", 320, 340);
+    ctx.fillText(hasSave() ? "空格：继续　点击可选新游戏" : "WASD/方向移动 · J/Z/空格挥剑 · E对话", 320, 340);
     ctx.textAlign = "left";
   }
 
@@ -1088,7 +1149,10 @@
     if (e.key === " " || e.key === "Spacebar") {
       if (mode === MODE.DIALOG) { advanceDialog(); e.preventDefault(); }
       else if (mode === MODE.PLAY && hasSword) { atkQueued = true; e.preventDefault(); }
-      else if (mode === MODE.TITLE) clickTitle(0);
+      else if (mode === MODE.TITLE) {
+        // Continue if save exists — Space must not only New Game
+        clickTitle(hasSave() ? 1 : 0);
+      }
     }
     if ((e.key === "j" || e.key === "J" || e.key === "z" || e.key === "Z") && mode === MODE.PLAY) atkQueued = true;
     if (e.key === "Escape" && mode === MODE.DIALOG) advanceDialog();
@@ -1195,7 +1259,7 @@
     e.preventDefault();
     if (mode === MODE.DIALOG) advanceDialog();
     else if (mode === MODE.PLAY) { touchSword = true; atkQueued = true; }
-    else if (mode === MODE.TITLE) clickTitle(0);
+    else if (mode === MODE.TITLE) clickTitle(hasSave() ? 1 : 0);
   }, { passive: false });
 
   btnInteract.addEventListener("touchstart", (e) => {
