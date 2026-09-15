@@ -237,39 +237,118 @@
 
   function drawNpc(ctx, x, y, kind, flash) {
     // kind: elder | merchant | villager
+    // P1: distinct from brown slime — taller humanoid, thick ink outline, hat/cape silhouette
     ctx.save();
     ctx.translate(Math.round(x), Math.round(y));
-    const cloak = kind === "elder" ? COLORS.orange : kind === "merchant" ? COLORS.grass : COLORS.stone;
+    const isElder = kind === "elder";
+    const isMerch = kind === "merchant";
+    const cloak = isElder ? COLORS.orange : isMerch ? COLORS.grass : COLORS.stone;
+    const bodyH = isElder ? 18 : isMerch ? 16 : 15;
+    const bodyTop = isElder ? -10 : isMerch ? -8 : -7;
+    const bodyW = isMerch ? 7 : 6; // merchant slightly wider cape
+
+    // thick ink silhouette first (reads vs flat slime oval)
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(-bodyW - 1, bodyTop + 2);
+    ctx.lineTo(bodyW + 1, bodyTop + 2);
+    ctx.lineTo(bodyW + 2, 9);
+    ctx.lineTo(-bodyW - 2, 9);
+    ctx.closePath();
+    ctx.stroke();
+
+    // cape / cloak body (trapezoid — not slime ellipse)
     ctx.fillStyle = cloak;
     ctx.beginPath();
-    ctx.moveTo(-6, -4); ctx.lineTo(6, -4); ctx.lineTo(5, 9); ctx.lineTo(-5, 9);
+    ctx.moveTo(-bodyW, bodyTop + 2);
+    ctx.lineTo(bodyW, bodyTop + 2);
+    ctx.lineTo(bodyW + 1, 9);
+    ctx.lineTo(-bodyW - 1, 9);
+    ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // head — taller oval above shoulders (humanoid, not blob)
+    const headY = isElder ? -6 : -4;
     ctx.fillStyle = COLORS.wood;
     ctx.beginPath();
-    ctx.ellipse(0, kind === "elder" ? -2 : 0, 6, kind === "elder" ? 8 : 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, headY, 5, isElder ? 6.5 : 5.5, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // face highlight + eyes
     ctx.fillStyle = COLORS.cream;
     ctx.beginPath();
-    ctx.ellipse(-1, kind === "elder" ? -4 : -2, 2.2, 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(-1, headY - 1.5, 2, 2.2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = COLORS.ink;
-    ctx.fillRect(-3, kind === "elder" ? -5 : -3, 2, 2);
-    ctx.fillRect(1, kind === "elder" ? -5 : -3, 2, 2);
-    if (kind === "elder") {
+    ctx.fillRect(-3, headY - 2.5, 2, 2);
+    ctx.fillRect(1, headY - 2.5, 2, 2);
+
+    if (isElder) {
+      // pointed hood / hat silhouette
+      ctx.fillStyle = COLORS.orange;
+      ctx.beginPath();
+      ctx.moveTo(-6, headY - 4);
+      ctx.lineTo(0, headY - 14);
+      ctx.lineTo(6, headY - 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // staff
       ctx.strokeStyle = COLORS.wood;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(7, -10); ctx.lineTo(7, 8);
+      ctx.moveTo(8, -12); ctx.lineTo(8, 9);
       ctx.stroke();
       ctx.fillStyle = COLORS.orange;
       ctx.beginPath();
-      ctx.arc(7, -11, 2, 0, Math.PI * 2);
+      ctx.arc(8, -13, 2.5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
+
+    if (isMerch) {
+      // wide brim hat — clear silhouette vs slime
+      ctx.fillStyle = COLORS.wood;
+      ctx.fillRect(-8, headY - 5, 16, 3);
+      ctx.beginPath();
+      ctx.ellipse(0, headY - 6, 5, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-8, headY - 5, 16, 3);
+      // satchel bump on side
+      ctx.fillStyle = COLORS.orange;
+      ctx.beginPath();
+      ctx.ellipse(7, 2, 3, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // feet stubs (humanoid read)
+    ctx.fillStyle = COLORS.ink;
+    ctx.globalAlpha = 0.45;
+    ctx.fillRect(-4, 9, 3, 2);
+    ctx.fillRect(1, 9, 3, 2);
+    ctx.globalAlpha = 1;
+
     if (flash) {
       ctx.fillStyle = COLORS.orange;
       ctx.font = "bold 12px sans-serif";
-      ctx.fillText("!", -2, -14);
+      ctx.fillText("!", -2, bodyTop - 6);
     }
     ctx.restore();
   }
@@ -306,10 +385,32 @@
     ctx.restore();
   }
 
-  function drawBoss(ctx, x, y, phase, flash, dead, telegraph, timeMs) {
+  function drawBoss(ctx, x, y, phase, flash, dead, telegraph, timeMs, windup) {
     ctx.save();
     ctx.translate(Math.round(x), Math.round(y));
     if (dead) ctx.globalAlpha = 0.4;
+
+    // 蓄力停步: crouch squash + cream charge ring under body (NOT orange-eye dash)
+    if (windup && !telegraph) {
+      const t = timeMs || 0;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 0.04);
+      const r = 16 + 6 * pulse;
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.35 * pulse;
+      ctx.strokeStyle = COLORS.cream;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 6, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = COLORS.danger;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 6, r * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      ctx.scale(1.12, 0.82); // readable crouch / charge pose
+    }
+
     ctx.strokeStyle = COLORS.ink;
     ctx.lineWidth = 3;
     ctx.fillStyle = flash ? COLORS.cream : COLORS.stone;
@@ -324,10 +425,12 @@
     ctx.moveTo(2, -14); ctx.lineTo(6, -22); ctx.lineTo(10, -14);
     ctx.fill();
     // idle eyes (P1 danger red / P2 orange) — under telegraph overlay
+    // windup: keep narrow danger eyes (no orange enlarge) so dash telegraph stays unique
     if (!telegraph) {
-      ctx.fillStyle = phase >= 2 ? COLORS.orange : COLORS.danger;
-      ctx.fillRect(-7, -4, 4, 4);
-      ctx.fillRect(3, -4, 4, 4);
+      ctx.fillStyle = windup ? COLORS.danger : (phase >= 2 ? COLORS.orange : COLORS.danger);
+      const ew = windup ? 3 : 4;
+      ctx.fillRect(-7, -4, ew, ew);
+      ctx.fillRect(3, -4, ew, ew);
     }
     // P0 telegraph: draw ABOVE body — enlarged flashing orange eyes (distinct from idle red)
     if (telegraph) {
@@ -481,28 +584,30 @@
         drawHeart(ctx, 8 + i * 12, 6, false);
       }
     }
-    // temple key (orange) + boss key (cream/stone) separately
+    // temple key + boss key separately WITH Chinese labels
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "left";
+    // 神殿钥 (orange)
     ctx.fillStyle = COLORS.orange;
     ctx.fillRect(8, 20, 3, 6);
     ctx.beginPath();
     ctx.arc(9.5, 18, 2.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = COLORS.cream;
-    ctx.font = "12px sans-serif";
-    ctx.fillText("×" + (keys | 0), 16, 26);
-    // boss key
+    ctx.fillText("殿×" + (keys | 0), 16, 26);
+    // Boss钥 (cream + orange rim)
     ctx.fillStyle = COLORS.cream;
-    ctx.fillRect(48, 20, 3, 6);
+    ctx.fillRect(58, 20, 3, 6);
     ctx.beginPath();
-    ctx.arc(49.5, 18, 2.5, 0, Math.PI * 2);
+    ctx.arc(59.5, 18, 2.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COLORS.orange;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(49.5, 18, 2.5, 0, Math.PI * 2);
+    ctx.arc(59.5, 18, 2.5, 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = COLORS.cream;
-    ctx.fillText("×" + (bossKeys | 0), 56, 26);
+    ctx.fillText("Boss×" + (bossKeys | 0), 66, 26);
     // coins
     ctx.fillStyle = COLORS.orange;
     ctx.beginPath();

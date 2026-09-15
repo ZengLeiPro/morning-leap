@@ -255,6 +255,8 @@
       type: "boss", hp: b.hp || 8, maxHp: 8, dmg: 1, speed: 32,
       x: b.x, y: b.y, flash: 0, stun: 0, dead: false, knock: { x: 0, y: 0 },
       phase: 1, telegraph: 0, dash: 0, dashVx: 0, dashVy: 0,
+      // P1 learnable: wind-up standstill (蓄力停步) then slam — distinct from orange-eye dash
+      windup: 0, slam: 0, slamVx: 0, slamVy: 0, atkKind: "dash",
       summoned: false, deathT: 0, phaseFlash: 0,
     };
   }
@@ -392,11 +394,11 @@
     e.hp -= 1;
     e.flash = 120;
     if (e.type === "stone") e.stun = 120;
-    // knockback away from player
+    // knockback away from player (P1 night: meatier than prior ~12)
     const dx = e.x - player.x, dy = e.y - player.y;
     const len = Math.hypot(dx, dy) || 1;
-    e.knock.x = (dx / len) * 12;
-    e.knock.y = (dy / len) * 12;
+    e.knock.x = (dx / len) * 24;
+    e.knock.y = (dy / len) * 24;
     hitstop = HITSTOP_MS;
     if (e.hp <= 0) {
       e.dead = true;
@@ -421,8 +423,9 @@
     if (from) {
       const dx = player.x - from.x, dy = player.y - from.y;
       const len = Math.hypot(dx, dy) || 1;
-      player.knock.x = (dx / len) * 14;
-      player.knock.y = (dy / len) * 14;
+      // P1 night: meatier hurt knockback (was ~14)
+      player.knock.x = (dx / len) * 26;
+      player.knock.y = (dy / len) * 26;
     }
     if (player.hp <= 0) {
       mode = MODE.DEAD;
@@ -681,8 +684,8 @@
     // knockback decay
     if (player.knock.x || player.knock.y) {
       tryMove(player, player.knock.x, player.knock.y);
-      player.knock.x *= 0.7;
-      player.knock.y *= 0.7;
+      player.knock.x *= 0.72;
+      player.knock.y *= 0.72;
       if (Math.abs(player.knock.x) < 0.2) player.knock.x = 0;
       if (Math.abs(player.knock.y) < 0.2) player.knock.y = 0;
     }
@@ -825,7 +828,7 @@
       if (e.stun > 0) { e.stun -= dt; continue; }
       if (e.knock.x || e.knock.y) {
         tryMove(e, e.knock.x, e.knock.y);
-        e.knock.x *= 0.6; e.knock.y *= 0.6;
+        e.knock.x *= 0.65; e.knock.y *= 0.65;
       }
 
       if (e.type === "slime") {
@@ -903,10 +906,10 @@
       }
     }
 
+    // Existing orange-eye dash telegraph (standstill then dash) — keep readable
     if (e.telegraph > 0) {
       e.telegraph -= dt;
       if (e.telegraph <= 0) {
-        // start dash
         const dx = player.x - e.x, dy = player.y - e.y;
         const len = Math.hypot(dx, dy) || 1;
         e.dash = 280;
@@ -921,14 +924,41 @@
       return;
     }
 
-    // chase + occasionally telegraph dash
+    // P1 learnable: 蓄力停步 (wind-up standstill) → short slam lunge
+    // Distinct from dash: longer freeze + cream charge ring (no orange-eye overlay)
+    if (e.windup > 0) {
+      e.windup -= dt;
+      if (e.windup <= 0) {
+        e.windup = 0;
+        const dx = player.x - e.x, dy = player.y - e.y;
+        const len = Math.hypot(dx, dy) || 1;
+        e.slam = 200;
+        e.slamVx = (dx / len) * 110;
+        e.slamVy = (dy / len) * 110;
+      }
+      return; // standstill during wind-up
+    }
+    if (e.slam > 0) {
+      e.slam -= dt;
+      tryMove(e, e.slamVx * dt / 1000, e.slamVy * dt / 1000);
+      return;
+    }
+
+    // chase + pick telegraphable attack (alternate dash vs wind-up)
     const dx = player.x - e.x, dy = player.y - e.y;
     const len = Math.hypot(dx, dy) || 1;
     tryMove(e, (dx / len) * e.speed * dt / 1000, (dy / len) * e.speed * dt / 1000);
     e._dashCd = (e._dashCd || 0) - dt;
     if (e._dashCd <= 0 && Math.hypot(dx, dy) < 120) {
-      e.telegraph = 300; // red-eye telegraph P0
-      e._dashCd = e.phase === 2 ? 1600 : 2400;
+      e._atkAlt = !(e._atkAlt); // alternate for learnability
+      if (e._atkAlt) {
+        e.atkKind = "windup";
+        e.windup = 520; // 蓄力停步 — clearly readable freeze
+      } else {
+        e.atkKind = "dash";
+        e.telegraph = 300; // orange-eye dash telegraph (unchanged)
+      }
+      e._dashCd = e.phase === 2 ? 1500 : 2200;
     }
   }
 
@@ -1021,7 +1051,7 @@
             Art.drawBoss(
               ctx, e.x, e.y, e.phase,
               e.flash > 0 || e.phaseFlash > 0, e.hp <= 0,
-              e.telegraph > 0, time
+              e.telegraph > 0, time, e.windup > 0
             );
           }
         },
