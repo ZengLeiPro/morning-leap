@@ -627,8 +627,7 @@
           flags.bossDoorOpen = true;
         }
         enterRoom(dest, sx, sy);
-        mode = MODE.PLAY;
-        fadeDir = -1;
+        // Stay in FADE until fade-out completes; FADE branch sets PLAY at fade<=0
         updateDoorVisuals();
         save();
       });
