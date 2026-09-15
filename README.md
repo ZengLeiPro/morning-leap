@@ -46,3 +46,11 @@ npx --yes serve .
 - 配色与造型对齐美术规范 v1.1（晨光橙 + 咖啡棕 + 玻璃蓝灰）
 
 祝你晨光里飞得更远 ☕
+
+
+## 《晨光神殿》（Zelda-like）
+
+俯视 RPG 小品，路径：[`temple/`](./temple/)。
+
+- 打开 `temple/index.html`，或静态服务后访问 `/temple/`
+- GitHub Pages：`https://zengleipro.github.io/morning-leap/temple/`

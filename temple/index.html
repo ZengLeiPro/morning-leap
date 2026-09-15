@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="description" content="晨光神殿 — 塞尔达式俯视 RPG：取回晨光核" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>晨光神殿</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="game" width="640" height="360" aria-label="晨光神殿游戏画布"></canvas>
+    <div id="touch" class="touch-ui" aria-hidden="true">
+      <div id="stick" class="stick">
+        <div id="knob" class="knob"></div>
+      </div>
+      <button type="button" id="btn-sword" class="btn-action">剑</button>
+      <button type="button" id="btn-interact" class="btn-action btn-interact">谈</button>
+    </div>
+  </div>
+  <script src="art.js"></script>
+  <script src="maps.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
