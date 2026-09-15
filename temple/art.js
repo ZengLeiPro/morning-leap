@@ -306,7 +306,7 @@
     ctx.restore();
   }
 
-  function drawBoss(ctx, x, y, phase, flash, dead) {
+  function drawBoss(ctx, x, y, phase, flash, dead, telegraph, timeMs) {
     ctx.save();
     ctx.translate(Math.round(x), Math.round(y));
     if (dead) ctx.globalAlpha = 0.4;
@@ -323,9 +323,40 @@
     ctx.moveTo(-10, -14); ctx.lineTo(-6, -22); ctx.lineTo(-2, -14);
     ctx.moveTo(2, -14); ctx.lineTo(6, -22); ctx.lineTo(10, -14);
     ctx.fill();
-    ctx.fillStyle = phase >= 2 ? COLORS.orange : COLORS.danger;
-    ctx.fillRect(-7, -4, 4, 4);
-    ctx.fillRect(3, -4, 4, 4);
+    // idle eyes (P1 danger red / P2 orange) — under telegraph overlay
+    if (!telegraph) {
+      ctx.fillStyle = phase >= 2 ? COLORS.orange : COLORS.danger;
+      ctx.fillRect(-7, -4, 4, 4);
+      ctx.fillRect(3, -4, 4, 4);
+    }
+    // P0 telegraph: draw ABOVE body — enlarged flashing orange eyes (distinct from idle red)
+    if (telegraph) {
+      const t = timeMs || 0;
+      const pulse = 0.55 + 0.45 * Math.sin(t * 0.05);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      // outer glow discs
+      ctx.fillStyle = COLORS.orange;
+      ctx.beginPath();
+      ctx.arc(-5, -2, 7, 0, Math.PI * 2);
+      ctx.arc(5, -2, 7, 0, Math.PI * 2);
+      ctx.fill();
+      // bright cream cores for contrast
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = COLORS.cream;
+      ctx.beginPath();
+      ctx.arc(-5, -2, 3, 0, Math.PI * 2);
+      ctx.arc(5, -2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // ink rings
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(-5, -2, 7, 0, Math.PI * 2);
+      ctx.arc(5, -2, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.restore();
   }
 

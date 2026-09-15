@@ -950,18 +950,12 @@
           if (e.type === "slime") Art.drawSlime(ctx, e.x, e.y, !room.outdoor, e.squash > 0, e.flash > 0);
           else if (e.type === "stone") Art.drawStone(ctx, e.x, e.y, e.flash > 0);
           else if (e.type === "boss") {
-            // red-eye telegraph: draw extra glow
-            if (e.telegraph > 0) {
-              ctx.save();
-              ctx.globalAlpha = 0.5 + 0.5 * Math.sin(time * 0.04);
-              ctx.fillStyle = "#E76F51";
-              ctx.beginPath();
-              ctx.arc(e.x - 5, e.y - 4, 6, 0, Math.PI * 2);
-              ctx.arc(e.x + 5, e.y - 4, 6, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.restore();
-            }
-            Art.drawBoss(ctx, e.x, e.y, e.phase, e.flash > 0 || e.phaseFlash > 0, e.hp <= 0);
+            // telegraph drawn ON TOP of boss body inside drawBoss (flash orange enlarge)
+            Art.drawBoss(
+              ctx, e.x, e.y, e.phase,
+              e.flash > 0 || e.phaseFlash > 0, e.hp <= 0,
+              e.telegraph > 0, time
+            );
           }
         },
       });
