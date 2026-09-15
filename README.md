@@ -50,7 +50,9 @@ npx --yes serve .
 
 ## 《晨光神殿》（Zelda-like）
 
-俯视 RPG 小品，路径：[`temple/`](./temple/)。
+俯视 RPG 小品，路径：[`temple/`](./temple/)。Canvas **640×360**，对齐 `temple/docs/GDD-zeldalike-v1.1.md`。
 
-- 打开 `temple/index.html`，或静态服务后访问 `/temple/`
-- GitHub Pages：`https://zengleipro.github.io/morning-leap/temple/`
+- 打开 `temple/index.html`，或：`python3 -m http.server 8080` 后访问 `/temple/`
+- GitHub Pages：https://zengleipro.github.io/morning-leap/temple/
+- 操作：WASD/方向移动，J/Z/空格挥剑，E 对话；触屏有虚拟摇杆与剑键
+- 存档：`localStorage` 键名 `morning-temple-save`

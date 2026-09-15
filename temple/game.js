@@ -25,6 +25,7 @@
   let mode = MODE.TITLE;
   let fade = 0, fadeDir = 0, fadeCb = null;
   let hitstop = 0;
+  let doorCool = 0;
   let time = 0;
   let cam = { x: 0, y: 0 };
   let room = null;
@@ -269,10 +270,10 @@
   }
 
   function isDoorOpen(d) {
-    if (d.needKey) return player.keys >= 1;
-    if (d.needBossKey) return player.bossKeys >= 1;
-    if (d.needSwitchT3) return !!flags.switchT3;
-    if (d.needClear) return roomCleared();
+    if (d.needKey) return !!flags.templeUnlocked || player.keys >= 1;
+    if (d.needBossKey) return !!flags.bossDoorOpen || player.bossKeys >= 1;
+    if (d.needSwitchT3) return !!flags.switchT3; // north: switch ONLY
+    if (d.needClear) return roomCleared(); // west: clear ONLY
     return true;
   }
 
@@ -556,7 +557,7 @@
   }
 
   function tryDoor() {
-    if (!room) return;
+    if (!room || doorCool > 0 || mode === MODE.FADE) return;
     const pb = footBox(player.x, player.y);
     for (const d of room.doors || []) {
       const db = { x: d.x * T, y: d.y * T, w: (d.w || 1) * T, h: (d.h || 1) * T };
@@ -577,12 +578,15 @@
       // consume keys
       const dest = d.target;
       const sx = d.spawnAt.x, sy = d.spawnAt.y;
+      doorCool = 500;
       fadeTo(() => {
-        if (d.consumeKey && d.needKey) {
+        if (d.consumeKey && d.needKey && !flags.templeUnlocked) {
           player.keys = Math.max(0, player.keys - 1);
+          flags.templeUnlocked = true;
         }
-        if (d.consumeBossKey && d.needBossKey) {
+        if (d.consumeBossKey && d.needBossKey && !flags.bossDoorOpen) {
           player.bossKeys = Math.max(0, player.bossKeys - 1);
+          flags.bossDoorOpen = true;
         }
         enterRoom(dest, sx, sy);
         mode = MODE.PLAY;
@@ -601,6 +605,7 @@
       toast.t -= dt;
       if (toast.t <= 0) toast = null;
     }
+    if (doorCool > 0) doorCool -= dt;
 
     if (mode === MODE.FADE) {
       fade += fadeDir * (dt / 200);
