@@ -74,6 +74,7 @@
       hurtFlash: 0,
       winPose: 0,
       knock: { x: 0, y: 0 },
+      spawnProt: 0,
     };
   }
 
@@ -140,6 +141,7 @@
     questOn = false;
     bestEnding = false;
     enterRoom("village", null, null, true);
+    player.spawnProt = 3000; // no damage after new game
     mode = MODE.PLAY;
     save();
   }
@@ -199,9 +201,12 @@
         }
       }
     }
-    // enemies (reset on enter — death also resets temple enemies)
-    for (const e of def.enemies || []) {
-      enemies.push(spawnEnemy(e));
+    // enemies: if permanently cleared, skip respawn so needClear doors stay unblocked
+    ensureClearedMap();
+    if (!flags.cleared[id]) {
+      for (const e of def.enemies || []) {
+        enemies.push(spawnEnemy(e));
+      }
     }
     if (def.boss && !flags.bossDead) {
       enemies.push(spawnBoss(def.boss));
@@ -409,7 +414,7 @@
   }
 
   function hurtPlayer(dmg, from) {
-    if (player.iframe > 0 || mode !== MODE.PLAY) return;
+    if (player.spawnProt > 0 || player.iframe > 0 || mode !== MODE.PLAY) return;
     player.hp = Math.max(0, player.hp - dmg);
     player.iframe = IFRAME;
     player.hurtFlash = IFRAME;
@@ -434,6 +439,7 @@
     player.knock.x = player.knock.y = 0;
     showDialog("旁白", ["眼前一黑……晨光还在等你。"], () => {
       enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
+      player.spawnProt = 3000; // no damage after village respawn
       mode = MODE.PLAY;
       save();
     });
@@ -596,7 +602,7 @@
 
       if (!isDoorOpen(d)) {
         let msg = d.lockedMsg || "门还锁着。";
-        if (d.needKey && !hasSword) msg = "先去找长老拿剑。";
+        if (d.needKey && !hasSword) msg = "先找长老拿剑。";
         else if (d.needKey && !(flags.templeUnlocked || player.keys >= 1)) msg = d.lockedMsg || "需要钥匙。";
         if (!toast || toast.t < 200) showToast(msg);
         // nudge back
@@ -665,6 +671,7 @@
     if (hitstop > 0) return; // freeze world during hitstop
 
     // player timers
+    if (player.spawnProt > 0) player.spawnProt -= dt;
     if (player.iframe > 0) player.iframe -= dt;
     if (player.hurtFlash > 0) player.hurtFlash -= dt;
     if (player.swingT >= 0) {
@@ -879,7 +886,7 @@
       showToast("残阳守卫进入第二阶段！");
       if (!e.summoned) {
         e.summoned = true;
-        e.summonWarn = 900; // ground circle before slime
+        e.summonWarn = 500; // landing warning ~400–600ms
         e.summonX = e.x + 30;
         e.summonY = e.y;
       }
