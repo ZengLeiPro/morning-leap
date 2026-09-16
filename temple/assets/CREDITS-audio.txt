@@ -1,0 +1,18 @@
+Audio credits — 《晨光神殿》 feel-slice
+========================================
+
+SFX: 50 RPG sound effects — Kenney Vleugels (www.kenney.nl) — CC0
+     https://opengameart.org/content/50-rpg-sound-effects
+     See also: assets/LICENSE-kenney-rpg-sfx.txt
+
+BGM: 15 Melodic RPG Chiptunes — Aureolus_Omicron — CC0
+     https://opengameart.org/content/15-melodic-rpg-chiptunes
+
+Suggested credit line: Audio: Kenney.nl · Aureolus_Omicron
+
+Files in assets/audio/:
+  bgm_village.ogg  (rpgchip03_town)
+  bgm_temple.ogg   (rpgchip06_dungeon)
+  bgm_boss.ogg     (rpgchip12_the_evil_one)
+  sfx_sword.ogg, sfx_hurt.ogg, sfx_door.ogg, sfx_pickup.ogg,
+  sfx_dialog.ogg, sfx_boss_warn.ogg

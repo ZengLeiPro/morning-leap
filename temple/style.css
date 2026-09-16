@@ -108,6 +108,7 @@ html, body {
   gap: calc(var(--ui-scale, 1) * 5px);
   padding-top: 0;
   flex-shrink: 0;
+  pointer-events: auto;
 }
 .ui-title-hint {
   position: static;
@@ -128,7 +129,7 @@ html, body {
 .ui-hud-stats {
   position: absolute;
   top: calc(var(--ui-scale, 1) * 2px);
-  right: calc(var(--ui-scale, 1) * 2px);
+  right: calc(var(--ui-scale, 1) * 28px);
   min-width: calc(var(--ui-scale, 1) * 76px);
   padding: calc(var(--ui-scale, 1) * 3px) calc(var(--ui-scale, 1) * 6px);
   background: rgba(42, 31, 26, 0.75);
@@ -296,4 +297,39 @@ html, body {
   width: 56px; height: 56px;
   font-size: 15px;
   background: #3D8B6E;
+}
+
+/* Mute — small, does not cover stick/sword */
+.ui-btn-mute {
+  width: calc(var(--ui-scale, 1) * 72px);
+  height: calc(var(--ui-scale, 1) * 18px);
+  margin-top: calc(var(--ui-scale, 1) * 4px);
+  font-size: calc(var(--ui-scale, 1) * 8px);
+  pointer-events: auto;
+}
+.ui-btn-mute[aria-pressed="true"] {
+  background: #6F4E37;
+}
+.ui-btn-mute-hud {
+  position: absolute;
+  top: calc(var(--ui-scale, 1) * 2px);
+  right: calc(var(--ui-scale, 1) * 2px);
+  width: calc(var(--ui-scale, 1) * 22px);
+  height: calc(var(--ui-scale, 1) * 16px);
+  padding: 0;
+  border: 1px solid #F5E6D3;
+  border-radius: 2px;
+  background: rgba(42, 31, 26, 0.8);
+  color: #F5E6D3;
+  font: inherit;
+  font-size: calc(var(--ui-scale, 1) * 8px);
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 3;
+}
+.ui-btn-mute-hud[aria-pressed="true"] {
+  color: #F4A261;
+  border-color: #F4A261;
 }

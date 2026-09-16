@@ -21,10 +21,13 @@
           <div class="ui-title-footer">
             <p class="ui-title-hint">WASD移动 · J/Z挥剑 · E对话</p>
             <p class="ui-title-credit">Art: Kenney.nl · Characters: Shade (Puny)</p>
+            <p class="ui-title-credit">Audio: Kenney.nl · Aureolus_Omicron</p>
+            <button type="button" id="btn-mute-title" class="ui-btn ui-btn-mute" aria-pressed="false">声音:开</button>
           </div>
         </div>
         <div id="ui-hud" class="ui-layer ui-hud hidden">
           <div id="ui-hud-stats" class="ui-hud-stats"></div>
+          <button type="button" id="btn-mute-hud" class="ui-btn-mute-hud" aria-pressed="false" title="静音">声</button>
           <div id="ui-hud-quest" class="ui-hud-quest hidden"></div>
         </div>
         <div id="ui-toast" class="ui-layer ui-toast hidden"></div>
@@ -55,6 +58,7 @@
   </div>
   <script src="art.js"></script>
   <script src="maps.js"></script>
+  <script src="audio.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

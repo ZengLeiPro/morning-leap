@@ -6,6 +6,7 @@
 
   const Art = window.TempleArt;
   const Maps = window.TempleMaps;
+  const AudioX = window.TempleAudio;
   const T = Maps.T;
   const W = 320, H = 180;
   const SAVE_KEY = "morning-temple-save";
@@ -35,6 +36,9 @@
   const uiDialogName = document.getElementById("ui-dialog-name");
   const uiDialogBody = document.getElementById("ui-dialog-body");
   const uiEnd = document.getElementById("ui-end");
+  const btnMuteTitle = document.getElementById("btn-mute-title");
+  const btnMuteHud = document.getElementById("btn-mute-hud");
+
 
   const MODE = { TITLE: "title", PLAY: "play", DIALOG: "dialog", FADE: "fade", END: "end", DEAD: "dead" };
 
@@ -103,6 +107,43 @@
   }
   window.addEventListener("resize", fitCanvas);
   fitCanvas();
+
+  function syncMuteUI() {
+    const on = !(AudioX && AudioX.isMuted());
+    const label = on ? "声音:开" : "声音:关";
+    const pressed = on ? "false" : "true";
+    if (btnMuteTitle) {
+      btnMuteTitle.textContent = label;
+      btnMuteTitle.setAttribute("aria-pressed", pressed);
+    }
+    if (btnMuteHud) {
+      btnMuteHud.textContent = on ? "声" : "静";
+      btnMuteHud.setAttribute("aria-pressed", pressed);
+      btnMuteHud.title = on ? "静音" : "取消静音";
+    }
+  }
+  function unlockAudio() {
+    if (AudioX) AudioX.unlock();
+  }
+  function onMuteClick(ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    unlockAudio();
+    if (AudioX) AudioX.toggleMute();
+    syncMuteUI();
+  }
+  if (btnMuteTitle) btnMuteTitle.addEventListener("click", onMuteClick);
+  if (btnMuteHud) btnMuteHud.addEventListener("click", onMuteClick);
+  syncMuteUI();
+
+  // Browsers require a user gesture before AudioContext can start
+  function gestureUnlock() {
+    unlockAudio();
+    window.removeEventListener("pointerdown", gestureUnlock, true);
+    window.removeEventListener("keydown", gestureUnlock, true);
+  }
+  window.addEventListener("pointerdown", gestureUnlock, true);
+  window.addEventListener("keydown", gestureUnlock, true);
+
 
   function setHidden(el, hidden) {
     if (!el) return;
@@ -282,6 +323,7 @@
     else { player.x = def.spawn.x; player.y = def.spawn.y; }
     player.vx = player.vy = 0;
     updateDoorVisuals();
+    if (AudioX) AudioX.playBgmForRoom(id, false);
     if (!skipFade) save();
   }
 
@@ -445,6 +487,7 @@
 
   function hurtPlayer(dmg, from) {
     if (player.spawnProt > 0 || player.iframe > 0 || mode !== MODE.PLAY) return;
+    if (AudioX) AudioX.playSfx("hurt");
     player.hp = Math.max(0, player.hp - dmg);
     player.iframe = IFRAME;
     player.hurtFlash = IFRAME;
@@ -480,6 +523,7 @@
   function showDialog(name, lines, onDone) {
     dialog = { name, lines: lines.slice(), i: 0, onDone: onDone || null };
     mode = MODE.DIALOG;
+    if (AudioX) AudioX.playSfx("dialog");
   }
   function advanceDialog() {
     if (!dialog) return;
@@ -490,6 +534,8 @@
       mode = MODE.PLAY;
       if (cb) cb();
       save();
+    } else if (AudioX) {
+      AudioX.playSfx("dialog");
     }
   }
   function showToast(text) { toast = { text, t: 1400 }; }
@@ -551,6 +597,7 @@
           player.gold -= 5;
           player.keys = Math.min(9, player.keys + 1);
           flags.boughtKey = true;
+          if (AudioX) AudioX.playSfx("pickup");
           showToast("获得神殿钥匙 ×1");
           save();
         });
@@ -563,6 +610,7 @@
   function openChest(c) {
     c.open = true;
     openedChests[c.id] = true;
+    if (AudioX) AudioX.playSfx("pickup");
     if (c.reward === "maxhp") {
       player.maxHp = Math.min(4, player.maxHp + 1);
       player.hp = player.maxHp;
@@ -576,6 +624,7 @@
   function takeCore() {
     flags.ending = true;
     bestEnding = true;
+    if (AudioX) AudioX.playSfx("pickup");
     showDialog("旁白", ["早晨回来了。村子又吵又暖。"], () => {
       mode = MODE.END;
       save();
@@ -613,6 +662,7 @@
 
       const dest = d.target, sx = d.spawnAt.x, sy = d.spawnAt.y;
       doorCool = 500;
+      if (AudioX) AudioX.playSfx("door");
       fadeTo(() => {
         if (d.consumeKey && d.needKey && !flags.templeUnlocked) {
           player.keys = Math.max(0, player.keys - 1);
@@ -635,6 +685,7 @@
   // ─── Update ─────────────────────────────────────────────────────────────
   function update(dt) {
     time += dt;
+    if (AudioX) AudioX.update(dt);
     if (toast) { toast.t -= dt; if (toast.t <= 0) toast = null; }
     if (doorCool > 0) doorCool -= dt;
 
@@ -701,6 +752,7 @@
     // Attack: edge-queued KeyJ/KeyZ only (not Space, not hold-repeat from stuck keys)
     if (mode === MODE.PLAY && (atkQueued || touchSword) && hasSword && player.swingT < 0) {
       player.swingT = 0;
+      if (AudioX) AudioX.playSfx("sword");
       atkQueued = false;
       touchSword = false;
     } else {
@@ -743,6 +795,7 @@
         player.gold = Math.min(99, player.gold + 1);
         if (!g.drop) takenPickups[g.id] = true;
         golds.splice(i, 1);
+        if (AudioX) AudioX.playSfx("pickup");
         save();
       }
     }
@@ -752,6 +805,7 @@
         player.hp = Math.min(player.maxHp, player.hp + 1);
         takenPickups[h.id] = true;
         hearts.splice(i, 1);
+        if (AudioX) AudioX.playSfx("pickup");
         showToast("恢复了心力");
         save();
       }
@@ -768,6 +822,7 @@
           showToast("获得钥匙 ×1");
         }
         groundKeys.splice(i, 1);
+        if (AudioX) AudioX.playSfx("pickup");
         save();
       }
     }
@@ -874,6 +929,7 @@
       e._atkAlt = !e._atkAlt;
       if (e._atkAlt) { e.atkKind = "windup"; e.windup = 520; }
       else { e.atkKind = "dash"; e.telegraph = 320; }
+      if (AudioX) AudioX.playSfx("boss_warn");
       e._dashCd = e.phase === 2 ? 1500 : 2200;
     }
   }
@@ -1163,8 +1219,14 @@
   }
 
   player = defaultPlayer();
-  Art.loadAll().then(() => {
+  const boot = Promise.all([
+    Art.loadAll(),
+    AudioX ? AudioX.loadAll() : Promise.resolve(),
+  ]);
+  boot.then(() => {
     assetsReady = true;
+    syncMuteUI();
+    if (AudioX) AudioX.playBgm("village", true);
   }).catch((err) => {
     console.error(err);
     assetsReady = true; // allow fallback draw

@@ -56,4 +56,5 @@ npx --yes serve .
 - GitHub Pages：https://zengleipro.github.io/morning-leap/temple/
 - 操作：WASD/方向移动，**J/Z 挥剑**，**E/空格 对话**（键分离）；触屏摇杆（死区）+ 剑 / 谈
 - 内容：村小片 + 三房（门厅→钥室→Boss）；存档键 `morning-temple-save`
-- Credits：Art Kenney.nl · Characters Shade (Puny)
+- Credits：Art Kenney.nl · Characters Shade (Puny) · Audio Kenney.nl · Aureolus_Omicron
+- 声音默认开；标题/HUD「声音」按钮静音，键 `morning-temple-mute`

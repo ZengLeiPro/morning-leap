@@ -86,6 +86,29 @@
 
 ---
 
+
+---
+
+## 5b. 音频（P0，不扩地图）
+
+素材与授权见 `docs/audio-assets-v1.md`（CC0：Kenney + Aureolus）。
+
+| 触发 | 资源 |
+|------|------|
+| 村 | `bgm_village.ogg` 循环 |
+| 神殿（非 Boss 房） | `bgm_temple.ogg` 循环 |
+| Boss 房 T3 | `bgm_boss.ogg`（无则继续神殿 BGM） |
+| 挥剑命中/挥出 | `sfx_sword.ogg` |
+| 受伤 | `sfx_hurt.ogg` |
+| 开门 | `sfx_door.ogg` |
+| 捡金/钥/心 | `sfx_pickup.ogg` |
+| 对话翻页 | `sfx_dialog.ogg` |
+| Boss 预警 | `sfx_boss_warn.ogg` |
+
+规则：默认**开声**；标题/HUD **静音开关**；切房 crossfade≤0.4s 或硬切可接受；静音不挡操作；Credits 写音频署名。
+
+验收：有基础声场 + 可静音 = 愿再玩音频闸。
+
 ## 6. 战斗（够味即可，不堆量）
 
 | 对象 | 要点 |
@@ -121,7 +144,7 @@
 - 失败：「眼前一黑……再试一次。」
 
 按钮：新游戏 / 继续 / 再走一程  
-Credits：Art Kenney.nl · Characters Shade (Puny) · 勿漏
+Credits：Art Kenney.nl · Characters Shade (Puny) · Audio Kenney.nl · Aureolus_Omicron · 勿漏
 
 ---
 
@@ -163,3 +186,4 @@ Credits：Art Kenney.nl · Characters Shade (Puny) · 勿漏
 | feel-slice v1 | 产品重裁：B + 320×180 + 三房；过线改愿再玩 |
 | feel-slice v1.1 | 村史莱姆锁死 0～1，不磨血 |
 | feel-slice v1.2 | 美术勘误：路25、房48–50/72–74/85、心115、标题钮不盖 help；packed STRIDE=16 |
+| feel-slice v1.6 | 音频 P0：村/殿 BGM + 关键 SFX + 静音开关 |
