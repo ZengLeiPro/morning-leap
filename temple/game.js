@@ -1,5 +1,5 @@
 /**
- * 《晨光神殿》MVP — GDD v1.1 · Canvas 640×360 · vanilla JS
+ * 《晨光神殿》手感片 — GDD-feel-slice-v1 · 320×180 · 方案 B 图集
  */
 (function () {
   "use strict";
@@ -7,18 +7,21 @@
   const Art = window.TempleArt;
   const Maps = window.TempleMaps;
   const T = Maps.T;
-  const W = 640, H = 360;
+  const W = 320, H = 180;
   const SAVE_KEY = "morning-temple-save";
-  const SPEED = 80;
-  const ATK_MS = 180;
-  const ATK_ACTIVE = 80;
-  const IFRAME = 800;
-  const HITSTOP_MS = 50; // ~3 frames @60
+  const SPEED = 65;
+  const ATK_MS = 200;
+  const ATK_ACTIVE_START = 60;
+  const ATK_ACTIVE_END = 160;
+  const IFRAME = 700;
+  const HITSTOP_MS = 45;
+  const STICK_DEAD = 0.28;
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   canvas.width = W;
   canvas.height = H;
+  Art.noSmooth(ctx);
 
   const MODE = { TITLE: "title", PLAY: "play", DIALOG: "dialog", FADE: "fade", END: "end", DEAD: "dead" };
 
@@ -30,8 +33,8 @@
   let cam = { x: 0, y: 0 };
   let room = null;
   let roomId = "village";
+  let assetsReady = false;
 
-  // runtime entities
   let player = null;
   let enemies = [];
   let chests = [];
@@ -40,11 +43,11 @@
   let switches = [];
   let groundKeys = [];
   let core = null;
-  let particles = [];
 
-  let dialog = null; // { name, lines[], i }
-  let toast = null; // { text, t }
+  let dialog = null;
+  let toast = null;
   let panelBtns = [];
+  let moving = false;
 
   let flags = {};
   let openedChests = {};
@@ -53,65 +56,58 @@
   let hasSword = false;
   let questOn = false;
 
-  // input
   const keys = Object.create(null);
   let touchAxis = { x: 0, y: 0 };
   let touchSword = false;
-  let touchInteract = false;
   let atkQueued = false;
 
   function defaultPlayer() {
     return {
-      x: 0, y: 0,
-      vx: 0, vy: 0,
-      dir: 0, // 0 down 1 up 2 left 3 right
+      x: 0, y: 0, vx: 0, vy: 0,
+      dir: 0,
       hp: 3, maxHp: 3,
       gold: 0, keys: 0, bossKeys: 0,
-      swingT: -1,
-      iframe: 0,
-      walkFrame: 0,
-      walkAcc: 0,
-      hurtFlash: 0,
-      winPose: 0,
-      knock: { x: 0, y: 0 },
+      swingT: -1, iframe: 0,
+      walkFrame: 0, walkAcc: 0,
+      hurtFlash: 0, knock: { x: 0, y: 0 },
       spawnProt: 0,
     };
   }
 
+  // ─── Integer nearest scale ──────────────────────────────────────────────
+  function fitCanvas() {
+    const sx = Math.floor(window.innerWidth / W);
+    const sy = Math.floor(window.innerHeight / H);
+    const scale = Math.max(1, Math.min(sx, sy));
+    canvas.style.width = (W * scale) + "px";
+    canvas.style.height = (H * scale) + "px";
+    canvas.style.imageRendering = "pixelated";
+  }
+  window.addEventListener("resize", fitCanvas);
+  fitCanvas();
+
   // ─── Save / Load ────────────────────────────────────────────────────────
   function serialize() {
     return {
-      maxHp: player.maxHp,
-      hp: player.hp,
-      gold: player.gold,
-      keys: player.keys,
-      bossKeys: player.bossKeys,
+      maxHp: player.maxHp, hp: player.hp, gold: player.gold,
+      keys: player.keys, bossKeys: player.bossKeys,
       flags: Object.assign({}, flags),
       chests: Object.assign({}, openedChests),
       pickups: Object.assign({}, takenPickups),
-      roomId,
-      px: player.x,
-      py: player.y,
-      hasSword,
-      questOn,
-      bestEnding,
-      v: 2,
+      roomId, px: player.x, py: player.y,
+      hasSword, questOn, bestEnding, v: 3,
     };
   }
 
   function save() {
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(serialize()));
-    } catch (_) {}
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (_) {}
   }
 
   function loadRaw() {
     try {
       const s = localStorage.getItem(SAVE_KEY);
       return s ? JSON.parse(s) : null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   }
 
   function applySave(data) {
@@ -123,12 +119,15 @@
     player.bossKeys = data.bossKeys || 0;
     flags = data.flags || {};
     if (!flags.cleared || typeof flags.cleared !== "object") flags.cleared = {};
+    // migrate old switchT3 → switchT2
+    if (flags.switchT3 && !flags.switchT2) flags.switchT2 = true;
     openedChests = data.chests || {};
     takenPickups = data.pickups || {};
     hasSword = !!data.hasSword || !!flags.metElder;
     questOn = !!data.questOn || !!flags.metElder;
     bestEnding = !!data.bestEnding;
-    enterRoom(data.roomId || "village", data.px, data.py, true);
+    const rid = Maps.ROOMS[data.roomId] ? data.roomId : "village";
+    enterRoom(rid, data.px, data.py, true);
   }
 
   function newGame() {
@@ -141,14 +140,12 @@
     questOn = false;
     bestEnding = false;
     enterRoom("village", null, null, true);
-    player.spawnProt = 3000; // no damage after new game
+    player.spawnProt = 3000;
     mode = MODE.PLAY;
     save();
   }
 
-  function hasSave() {
-    return !!loadRaw();
-  }
+  function hasSave() { return !!loadRaw(); }
 
   // ─── Room ───────────────────────────────────────────────────────────────
   function enterRoom(id, px, py, skipFade) {
@@ -156,95 +153,58 @@
     if (!def) return;
     roomId = id;
     room = def;
-    enemies = [];
-    chests = [];
-    golds = [];
-    hearts = [];
-    switches = [];
-    groundKeys = [];
-    core = null;
-    particles = [];
+    enemies = []; chests = []; golds = []; hearts = [];
+    switches = []; groundKeys = []; core = null;
 
-    // chests
     for (const c of def.chests || []) {
-      chests.push({
-        id: c.id,
-        x: c.x, y: c.y,
-        reward: c.reward,
-        open: !!openedChests[c.id],
-      });
+      chests.push({ id: c.id, x: c.x, y: c.y, reward: c.reward, open: !!openedChests[c.id] });
     }
-    // gold pickups
     for (const g of def.goldPickups || []) {
       if (!takenPickups[g.id]) golds.push({ id: g.id, x: g.x, y: g.y });
     }
-    // hearts
     for (const h of def.hearts || []) {
       if (!takenPickups[h.id]) hearts.push({ id: h.id, x: h.x, y: h.y });
     }
-    // switches
     for (const s of def.switches || []) {
-      const pressed = !!flags[s.flag || "switchT3"];
+      const pressed = !!flags[s.flag || "switchT2"];
       switches.push({
-        id: s.id,
-        x: s.x, y: s.y,
-        flag: s.flag || "switchT3",
-        pressed,
-        dropsBossKey: s.dropsBossKey,
-        keyPos: s.keyPos,
-        justPressed: 0,
+        id: s.id, x: s.x, y: s.y, flag: s.flag || "switchT2",
+        pressed, dropsBossKey: s.dropsBossKey, keyPos: s.keyPos, justPressed: 0,
       });
-      if (pressed && s.dropsBossKey && !flags.bossKeySpawnedTaken && !flags.gotBossKeyPickup) {
-        // key already dropped historically — if not picked, respawn key if not in inventory
-        if ((player.bossKeys | 0) < 1 && !flags.gotBossKeyPickup) {
-          groundKeys.push({ id: "boss_key", x: s.keyPos.x, y: s.keyPos.y, boss: true });
-        }
+      if (pressed && s.dropsBossKey && !flags.gotBossKeyPickup && (player.bossKeys | 0) < 1) {
+        groundKeys.push({ id: "boss_key", x: s.keyPos.x, y: s.keyPos.y, boss: true });
       }
     }
-    // enemies: if permanently cleared, skip respawn so needClear doors stay unblocked
     ensureClearedMap();
     if (!flags.cleared[id]) {
-      for (const e of def.enemies || []) {
-        enemies.push(spawnEnemy(e));
-      }
+      for (const e of def.enemies || []) enemies.push(spawnEnemy(e));
     }
-    if (def.boss && !flags.bossDead) {
-      enemies.push(spawnBoss(def.boss));
-    }
-    if (flags.bossDead && id === "T5") {
+    if (def.boss && !flags.bossDead) enemies.push(spawnBoss(def.boss));
+    if (flags.bossDead && id === "T3" && def.boss) {
       core = { x: def.boss.x, y: def.boss.y, t: 0 };
     }
 
-    // player pos
-    if (px != null && py != null) {
-      player.x = px; player.y = py;
-    } else {
-      player.x = def.spawn.x;
-      player.y = def.spawn.y;
-    }
+    if (px != null && py != null) { player.x = px; player.y = py; }
+    else { player.x = def.spawn.x; player.y = def.spawn.y; }
     player.vx = player.vy = 0;
     updateDoorVisuals();
     if (!skipFade) save();
   }
 
   function spawnEnemy(e) {
-    // 3s spawn invulnerability before contact damage (village soft landing)
     const spawnInvuln = 3000;
     if (e.type === "slime") {
-      // village/T1 (slow:true) chase much slower; others keep base speed
-      const speed = e.slow ? 18 : 40;
       return {
-        type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed,
-        x: e.x, y: e.y, flash: 0, squash: 0, stun: 0, dead: false, knock: { x: 0, y: 0 },
-        spawnInvuln,
+        type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: e.slow ? 18 : 40,
+        x: e.x, y: e.y, flash: 0, squash: 0, stun: 0, dead: false,
+        knock: { x: 0, y: 0 }, spawnInvuln,
       };
     }
     if (e.type === "stone") {
       return {
         type: "stone", hp: 3, maxHp: 3, dmg: 1, speed: 28,
         x: e.x, y: e.y, flash: 0, stun: 0, dead: false, knock: { x: 0, y: 0 },
-        patrolDir: 1, patrolAcc: 0,
-        spawnInvuln,
+        patrolDir: 1, patrolAcc: 0, spawnInvuln,
       };
     }
     return spawnBoss(e);
@@ -255,21 +215,25 @@
       type: "boss", hp: b.hp || 8, maxHp: 8, dmg: 1, speed: 32,
       x: b.x, y: b.y, flash: 0, stun: 0, dead: false, knock: { x: 0, y: 0 },
       phase: 1, telegraph: 0, dash: 0, dashVx: 0, dashVy: 0,
-      // P1 learnable: wind-up standstill (蓄力停步) then slam — distinct from orange-eye dash
       windup: 0, slam: 0, slamVx: 0, slamVy: 0, atkKind: "dash",
       summoned: false, deathT: 0, phaseFlash: 0,
     };
   }
 
+  function doorLooksOpen(d) {
+    // Visual: switch alone opens T1 north look; boss key still required to enter
+    if (d.needSwitchT2 && d.needBossKey) return !!flags.switchT2;
+    return isDoorOpen(d);
+  }
+
   function updateDoorVisuals() {
     if (!room) return;
     for (const d of room.doors || []) {
-      const open = isDoorOpen(d);
+      const open = doorLooksOpen(d);
       for (let i = 0; i < (d.w || 1); i++) {
         for (let j = 0; j < (d.h || 1); j++) {
           const idx = (d.y + j) * room.w + (d.x + i);
-          // locked visual when closed and was lockable
-          if (d.lockedVisual || d.needKey || d.needBossKey || d.needSwitchT3 || d.needClear) {
+          if (d.lockedVisual || d.needKey || d.needBossKey || d.needSwitchT2 || d.needClear) {
             room.tiles[idx] = open ? 6 : 7;
           } else {
             room.tiles[idx] = 6;
@@ -282,30 +246,30 @@
   function roomCleared() {
     return enemies.every((e) => e.dead || e.hp <= 0);
   }
-
   function ensureClearedMap() {
     if (!flags.cleared || typeof flags.cleared !== "object") flags.cleared = {};
   }
-
   function markRoomClearedIfDone() {
     ensureClearedMap();
     if (roomCleared()) flags.cleared[roomId] = true;
   }
-
   function isRoomPermanentlyCleared() {
     ensureClearedMap();
     return !!flags.cleared[roomId];
   }
 
   function isDoorOpen(d) {
-    // Softlock: temple door requires sword first
     if (d.needKey) {
       if (!hasSword) return false;
       return !!flags.templeUnlocked || player.keys >= 1;
     }
+    // T1 north: switchT2 unlocks path; boss key still required to enter T3
+    if (d.needSwitchT2 && d.needBossKey) {
+      if (!flags.switchT2) return false;
+      return !!flags.bossDoorOpen || player.bossKeys >= 1;
+    }
     if (d.needBossKey) return !!flags.bossDoorOpen || player.bossKeys >= 1;
-    if (d.needSwitchT3) return !!flags.switchT3; // north: switch ONLY
-    // Permanent clear flag — never re-block after clear even if enemies respawn
+    if (d.needSwitchT2) return !!flags.switchT2;
     if (d.needClear) return isRoomPermanentlyCleared() || roomCleared();
     return true;
   }
@@ -314,63 +278,40 @@
   function footBox(px, py) {
     return { x: px - 5, y: py + 2, w: 10, h: 8 };
   }
-
   function aabb(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
-
   function solidAt(wx, wy) {
-    const tx = Math.floor(wx / T);
-    const ty = Math.floor(wy / T);
+    const tx = Math.floor(wx / T), ty = Math.floor(wy / T);
     if (!room || tx < 0 || ty < 0 || tx >= room.w || ty >= room.h) return true;
     const id = room.tiles[ty * room.w + tx];
-    // locked door tiles solid; open door walkable
     if (id === 7) return true;
     return Maps.isSolid(id);
   }
-
   function tryMove(ent, dx, dy) {
-    const nx = ent.x + dx;
-    const ny = ent.y + dy;
+    const nx = ent.x + dx, ny = ent.y + dy;
     const box = footBox(nx, ny);
-    const pts = [
-      [box.x, box.y], [box.x + box.w, box.y],
-      [box.x, box.y + box.h], [box.x + box.w, box.y + box.h],
-    ];
+    const pts = [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h]];
     let blocked = false;
-    for (const [px, py] of pts) {
-      if (solidAt(px, py)) { blocked = true; break; }
-    }
-    // NPC / chest soft block
+    for (const [px, py] of pts) if (solidAt(px, py)) { blocked = true; break; }
     if (!blocked && ent === player) {
       for (const n of room.npcs || []) {
-        const nb = { x: n.x - 6, y: n.y - 4, w: 12, h: 12 };
-        if (aabb(box, nb)) { blocked = true; break; }
+        if (aabb(box, { x: n.x - 6, y: n.y - 4, w: 12, h: 12 })) { blocked = true; break; }
       }
     }
-    if (!blocked) {
-      ent.x = nx; ent.y = ny;
-      return true;
-    }
-    // axis slide
+    if (!blocked) { ent.x = nx; ent.y = ny; return true; }
     if (dx !== 0 && tryMoveAxis(ent, dx, 0)) return true;
     if (dy !== 0 && tryMoveAxis(ent, 0, dy)) return true;
     return false;
   }
-
   function tryMoveAxis(ent, dx, dy) {
-    const nx = ent.x + dx;
-    const ny = ent.y + dy;
+    const nx = ent.x + dx, ny = ent.y + dy;
     const box = footBox(nx, ny);
-    const pts = [
-      [box.x, box.y], [box.x + box.w, box.y],
-      [box.x, box.y + box.h], [box.x + box.w, box.y + box.h],
-    ];
+    const pts = [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h]];
     for (const [px, py] of pts) if (solidAt(px, py)) return false;
     if (ent === player) {
       for (const n of room.npcs || []) {
-        const nb = { x: n.x - 6, y: n.y - 4, w: 12, h: 12 };
-        if (aabb(box, nb)) return false;
+        if (aabb(box, { x: n.x - 6, y: n.y - 4, w: 12, h: 12 })) return false;
       }
     }
     ent.x = nx; ent.y = ny;
@@ -379,13 +320,13 @@
 
   // ─── Combat ─────────────────────────────────────────────────────────────
   function swordBox() {
-    if (player.swingT < 0 || player.swingT > ATK_ACTIVE) return null;
+    if (player.swingT < ATK_ACTIVE_START || player.swingT > ATK_ACTIVE_END) return null;
     const w = 18, h = 12;
     let x = player.x, y = player.y;
     if (player.dir === 0) { x -= 9; y += 4; return { x, y, w, h }; }
     if (player.dir === 1) { x -= 9; y -= 16; return { x, y, w, h }; }
-    if (player.dir === 2) { x -= 18; y -= 6; return { x: x, y: y, w: h, h: w }; }
-    if (player.dir === 3) { x += 4; y -= 6; return { x: x, y: y, w: h, h: w }; }
+    if (player.dir === 2) { x -= 18; y -= 6; return { x, y, w: h, h: w }; }
+    if (player.dir === 3) { x += 4; y -= 6; return { x, y, w: h, h: w }; }
     return null;
   }
 
@@ -394,7 +335,6 @@
     e.hp -= 1;
     e.flash = 120;
     if (e.type === "stone") e.stun = 120;
-    // knockback away from player (P1 night: meatier than prior ~12)
     const dx = e.x - player.x, dy = e.y - player.y;
     const len = Math.hypot(dx, dy) || 1;
     e.knock.x = (dx / len) * 24;
@@ -403,13 +343,7 @@
     if (e.hp <= 0) {
       e.dead = true;
       if (e.type === "slime") e.squash = 200;
-      if (e.type === "boss") {
-        e.deathT = 600;
-        flags.bossDead = true;
-      } else if (Math.random() < (e.type === "stone" ? 0.5 : 0.3)) {
-        // optional gold drop (economy does not rely on it)
-        golds.push({ id: "drop_" + Math.random().toString(36).slice(2), x: e.x, y: e.y, drop: true });
-      }
+      if (e.type === "boss") { e.deathT = 600; flags.bossDead = true; }
       markRoomClearedIfDone();
       updateDoorVisuals();
     }
@@ -423,7 +357,6 @@
     if (from) {
       const dx = player.x - from.x, dy = player.y - from.y;
       const len = Math.hypot(dx, dy) || 1;
-      // P1 night: meatier hurt knockback (was ~14)
       player.knock.x = (dx / len) * 26;
       player.knock.y = (dy / len) * 26;
     }
@@ -435,14 +368,12 @@
   }
 
   function respawnVillage() {
-    // keep gold/keys/bossKeys; HP full; switches stay; chests stay
-    // temple enemies reset on re-enter
     player.hp = player.maxHp;
     player.iframe = 0;
     player.knock.x = player.knock.y = 0;
-    showDialog("旁白", ["眼前一黑……晨光还在等你。"], () => {
+    showDialog("旁白", ["眼前一黑……再试一次。"], () => {
       enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
-      player.spawnProt = 3000; // no damage after village respawn
+      player.spawnProt = 3000;
       mode = MODE.PLAY;
       save();
     });
@@ -453,7 +384,6 @@
     dialog = { name, lines: lines.slice(), i: 0, onDone: onDone || null };
     mode = MODE.DIALOG;
   }
-
   function advanceDialog() {
     if (!dialog) return;
     dialog.i++;
@@ -465,59 +395,42 @@
       save();
     }
   }
-
-  function showToast(text) {
-    toast = { text, t: 1400 };
-  }
+  function showToast(text) { toast = { text, t: 1400 }; }
 
   function interact() {
     if (mode === MODE.DIALOG) { advanceDialog(); return; }
     if (mode === MODE.TITLE || mode === MODE.END) return;
     if (mode !== MODE.PLAY) return;
 
-    // NPCs
     const pb = footBox(player.x, player.y);
     const reach = { x: pb.x - 8, y: pb.y - 8, w: pb.w + 16, h: pb.h + 16 };
 
     for (const n of room.npcs || []) {
-      const nb = { x: n.x - 10, y: n.y - 10, w: 20, h: 20 };
-      if (!aabb(reach, nb)) continue;
+      if (!aabb(reach, { x: n.x - 10, y: n.y - 10, w: 20, h: 20 })) continue;
       talkNpc(n);
       return;
     }
     for (const s of room.signs || []) {
-      const sb = { x: s.x - 10, y: s.y - 10, w: 20, h: 20 };
-      if (!aabb(reach, sb)) continue;
-      const lines = [s.text];
-      if (s.story === "stele" && !flags.stele) {
-        flags.stele = true;
-      }
-      showDialog("石碑", lines);
+      if (!aabb(reach, { x: s.x - 10, y: s.y - 10, w: 20, h: 20 })) continue;
+      if (s.story === "stele") flags.stele = true;
+      showDialog("石碑", [s.text]);
       return;
     }
     for (const c of chests) {
       if (c.open) continue;
-      const cb = { x: c.x - 10, y: c.y - 8, w: 20, h: 16 };
-      if (!aabb(reach, cb)) continue;
+      if (!aabb(reach, { x: c.x - 10, y: c.y - 8, w: 20, h: 16 })) continue;
       openChest(c);
       return;
     }
-    if (core) {
-      const cb = { x: core.x - 12, y: core.y - 12, w: 24, h: 24 };
-      if (aabb(reach, cb)) {
-        takeCore();
-        return;
-      }
+    if (core && aabb(reach, { x: core.x - 12, y: core.y - 12, w: 24, h: 24 })) {
+      takeCore();
     }
   }
 
   function talkNpc(n) {
     if (n.id === "elder") {
       if (!flags.metElder) {
-        showDialog("长老", [
-          "晨光核被拖进神殿了。拿上这把钝剑，先去东侧找钥匙商人问问路。",
-          "——对了，心要护好。",
-        ], () => {
+        showDialog("长老", ["晨光核在神殿里。东边商人有钥匙——心看好。"], () => {
           flags.metElder = true;
           hasSword = true;
           questOn = true;
@@ -525,17 +438,17 @@
           save();
         });
       } else if (flags.ending) {
-        showDialog("长老", ["你让早晨回来了。旅人，喝杯热的再上路吧。"]);
+        showDialog("长老", ["早晨回来了。村子又吵又暖。"]);
       } else {
-        showDialog("长老", ["神殿在村子北边。钥匙找东边的商人。"]);
+        showDialog("长老", ["晨光核在神殿里。东边商人有钥匙——心看好。"]);
       }
       return;
     }
     if (n.id === "merchant") {
       if (!hasSword) {
-        showDialog("钥匙商人", ["先去找长老吧。", "他在村子西边，会给你一把钝剑。"]);
+        showDialog("钥匙商人", ["先去找长老吧。"]);
       } else if (player.keys >= 1 || flags.boughtKey) {
-        showDialog("钥匙商人", ["小心石头人——要砍好几下。", "草地上有五枚金币，记得捡。"]);
+        showDialog("钥匙商人", ["小心石头人——要砍好几下。"]);
       } else if (player.gold >= 5) {
         showDialog("钥匙商人", ["神殿钥匙，五枚金币。成交？"], () => {
           player.gold -= 5;
@@ -545,16 +458,8 @@
           save();
         });
       } else {
-        showDialog("钥匙商人", [
-          "神殿钥匙五枚金币。",
-          "金币不够（要 5）。",
-          "草地上有五枚金币。",
-        ]);
+        showDialog("钥匙商人", ["神殿钥匙五枚金币。草地上有五枚。"]);
       }
-      return;
-    }
-    if (n.id === "villager") {
-      showDialog("村民", ["史莱姆怕剑光，石卫士要多砍几下。"]);
     }
   }
 
@@ -565,9 +470,6 @@
       player.maxHp = Math.min(4, player.maxHp + 1);
       player.hp = player.maxHp;
       showDialog("宝箱", ["心的上限增加了！"]);
-    } else if (c.reward === "gold5") {
-      player.gold = Math.min(99, player.gold + 5);
-      showDialog("宝箱", ["获得金币 ×5"]);
     } else {
       showDialog("宝箱", ["空空如也。"]);
     }
@@ -577,16 +479,13 @@
   function takeCore() {
     flags.ending = true;
     bestEnding = true;
-    showDialog("旁白", [
-      "暖光涌回屋顶。",
-      "长老：你让早晨回来了。旅人，喝杯热的再上路吧。",
-    ], () => {
+    showDialog("旁白", ["早晨回来了。村子又吵又暖。"], () => {
       mode = MODE.END;
       save();
     });
   }
 
-  // ─── Fade transition ────────────────────────────────────────────────────
+  // ─── Fade — callback must NOT set PLAY; only when fade<=0 ───────────────
   function fadeTo(cb) {
     mode = MODE.FADE;
     fade = 0;
@@ -598,17 +497,16 @@
     if (!room || doorCool > 0 || mode === MODE.FADE) return;
     const pb = footBox(player.x, player.y);
     for (const d of room.doors || []) {
-      const db = { x: d.x * T, y: d.y * T, w: (d.w || 1) * T, h: (d.h || 1) * T };
-      // expand slightly
-      db.x -= 2; db.y -= 2; db.w += 4; db.h += 4;
+      const db = { x: d.x * T - 2, y: d.y * T - 2, w: (d.w || 1) * T + 4, h: (d.h || 1) * T + 4 };
       if (!aabb(pb, db)) continue;
 
       if (!isDoorOpen(d)) {
         let msg = d.lockedMsg || "门还锁着。";
         if (d.needKey && !hasSword) msg = "先找长老拿剑。";
-        else if (d.needKey && !(flags.templeUnlocked || player.keys >= 1)) msg = d.lockedMsg || "需要钥匙。";
+        else if (d.needKey && !(flags.templeUnlocked || player.keys >= 1)) msg = "需要钥匙。";
+        else if (d.needSwitchT2 && !flags.switchT2) msg = "门还锁着。";
+        else if (d.needBossKey && !(flags.bossDoorOpen || player.bossKeys >= 1)) msg = "需要钥匙。";
         if (!toast || toast.t < 200) showToast(msg);
-        // nudge back
         if (d.y === 0) player.y += 2;
         else if (d.y >= room.h - 1) player.y -= 2;
         else if (d.x === 0) player.x += 2;
@@ -616,9 +514,7 @@
         return;
       }
 
-      // consume keys
-      const dest = d.target;
-      const sx = d.spawnAt.x, sy = d.spawnAt.y;
+      const dest = d.target, sx = d.spawnAt.x, sy = d.spawnAt.y;
       doorCool = 500;
       fadeTo(() => {
         if (d.consumeKey && d.needKey && !flags.templeUnlocked) {
@@ -641,14 +537,11 @@
   // ─── Update ─────────────────────────────────────────────────────────────
   function update(dt) {
     time += dt;
-    if (toast) {
-      toast.t -= dt;
-      if (toast.t <= 0) toast = null;
-    }
+    if (toast) { toast.t -= dt; if (toast.t <= 0) toast = null; }
     if (doorCool > 0) doorCool -= dt;
 
     if (mode === MODE.FADE) {
-      fade += fadeDir * (dt / 200);
+      fade += fadeDir * (dt / 180);
       if (fadeDir > 0 && fade >= 1) {
         fade = 1;
         if (fadeCb) { const c = fadeCb; fadeCb = null; c(); }
@@ -661,18 +554,11 @@
       if (mode !== MODE.PLAY && mode !== MODE.FADE) return;
     }
 
-    if (hitstop > 0) {
-      hitstop -= dt;
-      // still tick flash timers lightly
-    }
-
     if (mode === MODE.DIALOG || mode === MODE.TITLE || mode === MODE.END || mode === MODE.DEAD) {
       return;
     }
+    if (hitstop > 0) { hitstop -= dt; return; }
 
-    if (hitstop > 0) return; // freeze world during hitstop
-
-    // player timers
     if (player.spawnProt > 0) player.spawnProt -= dt;
     if (player.iframe > 0) player.iframe -= dt;
     if (player.hurtFlash > 0) player.hurtFlash -= dt;
@@ -681,16 +567,14 @@
       if (player.swingT >= ATK_MS) player.swingT = -1;
     }
 
-    // knockback decay
     if (player.knock.x || player.knock.y) {
       tryMove(player, player.knock.x, player.knock.y);
-      player.knock.x *= 0.72;
-      player.knock.y *= 0.72;
+      player.knock.x *= 0.72; player.knock.y *= 0.72;
       if (Math.abs(player.knock.x) < 0.2) player.knock.x = 0;
       if (Math.abs(player.knock.y) < 0.2) player.knock.y = 0;
     }
 
-    // movement
+    // hold-to-move continuous; diagonal normalize; release = stop (no sticky slide)
     let mx = 0, my = 0;
     if (keys.ArrowLeft || keys.a || keys.A) mx -= 1;
     if (keys.ArrowRight || keys.d || keys.D) mx += 1;
@@ -698,7 +582,8 @@
     if (keys.ArrowDown || keys.s || keys.S) my += 1;
     mx += touchAxis.x;
     my += touchAxis.y;
-    if (mx || my) {
+    moving = !!(mx || my);
+    if (moving) {
       const len = Math.hypot(mx, my) || 1;
       mx /= len; my /= len;
       if (Math.abs(mx) > Math.abs(my)) player.dir = mx < 0 ? 2 : 3;
@@ -706,52 +591,39 @@
       const step = SPEED * (dt / 1000);
       tryMove(player, mx * step, my * step);
       player.walkAcc += dt;
-      if (player.walkAcc > 120) {
+      if (player.walkAcc > 100) {
         player.walkAcc = 0;
-        player.walkFrame = (player.walkFrame + 1) % 2;
+        player.walkFrame = (player.walkFrame + 1) % 3;
       }
+    } else {
+      player.walkAcc = 0;
     }
 
-    // attack
-    if ((atkQueued || touchSword || keys.j || keys.J || keys.z || keys.Z) && hasSword && player.swingT < 0) {
+    // Attack: J/Z only (not Space, not dialog keys); never during dialog
+    if (mode === MODE.PLAY && (atkQueued || touchSword || keys.j || keys.J || keys.z || keys.Z) && hasSword && player.swingT < 0) {
       player.swingT = 0;
       atkQueued = false;
       touchSword = false;
     } else {
       atkQueued = false;
+      if (mode !== MODE.PLAY) touchSword = false;
     }
 
-    // sword hits
     const sb = swordBox();
     if (sb) {
       for (const e of enemies) {
         if (e.dead && e.type !== "boss") continue;
         if (e.hp <= 0 && e.type === "boss") continue;
         if (e._hitThisSwing) continue;
-        const eb = enemyBox(e);
-        if (aabb(sb, eb)) {
-          e._hitThisSwing = true;
-          hitEnemy(e);
-        }
+        if (aabb(sb, enemyBox(e))) { e._hitThisSwing = true; hitEnemy(e); }
       }
     } else {
       for (const e of enemies) e._hitThisSwing = false;
     }
 
-    // spikes
-    const ptx = Math.floor(player.x / T);
-    const pty = Math.floor((player.y + 4) / T);
-    if (room && ptx >= 0 && pty >= 0 && ptx < room.w && pty < room.h) {
-      if (room.tiles[pty * room.w + ptx] === 10) {
-        hurtPlayer(0.5, { x: player.x, y: player.y - 1 });
-      }
-    }
-
-    // switches
     for (const sw of switches) {
       if (sw.pressed) continue;
-      const sbx = { x: sw.x + 4, y: sw.y + 4, w: 8, h: 8 };
-      if (aabb(footBox(player.x, player.y), sbx)) {
+      if (aabb(footBox(player.x, player.y), { x: sw.x + 4, y: sw.y + 4, w: 8, h: 8 })) {
         sw.pressed = true;
         sw.justPressed = 80;
         flags[sw.flag] = true;
@@ -759,22 +631,16 @@
           groundKeys.push({ id: "boss_key", x: sw.keyPos.x, y: sw.keyPos.y, boss: true });
           showToast("机关启动！Boss钥匙出现了");
         }
-        // opens T2 north via flag
         updateDoorVisuals();
-        // also update T2 tiles if we're not there — flag is enough
         save();
       }
     }
-    for (const sw of switches) {
-      if (sw.justPressed > 0) sw.justPressed -= dt;
-    }
+    for (const sw of switches) if (sw.justPressed > 0) sw.justPressed -= dt;
 
-    // pickups
     const reach = footBox(player.x, player.y);
     for (let i = golds.length - 1; i >= 0; i--) {
       const g = golds[i];
-      const gb = { x: g.x - 5, y: g.y - 5, w: 10, h: 10 };
-      if (aabb(reach, gb)) {
+      if (aabb(reach, { x: g.x - 5, y: g.y - 5, w: 10, h: 10 })) {
         player.gold = Math.min(99, player.gold + 1);
         if (!g.drop) takenPickups[g.id] = true;
         golds.splice(i, 1);
@@ -783,8 +649,7 @@
     }
     for (let i = hearts.length - 1; i >= 0; i--) {
       const h = hearts[i];
-      const hb = { x: h.x - 4, y: h.y - 4, w: 8, h: 8 };
-      if (aabb(reach, hb)) {
+      if (aabb(reach, { x: h.x - 4, y: h.y - 4, w: 8, h: 8 })) {
         player.hp = Math.min(player.maxHp, player.hp + 1);
         takenPickups[h.id] = true;
         hearts.splice(i, 1);
@@ -794,8 +659,7 @@
     }
     for (let i = groundKeys.length - 1; i >= 0; i--) {
       const k = groundKeys[i];
-      const kb = { x: k.x - 6, y: k.y - 8, w: 12, h: 14 };
-      if (aabb(reach, kb)) {
+      if (aabb(reach, { x: k.x - 6, y: k.y - 8, w: 12, h: 14 })) {
         if (k.boss) {
           player.bossKeys = Math.min(9, player.bossKeys + 1);
           flags.gotBossKeyPickup = true;
@@ -809,18 +673,11 @@
       }
     }
 
-    // enemies AI
     for (const e of enemies) {
-      if (e.dead && e.type !== "boss") {
-        if (e.squash > 0) e.squash -= dt;
-        continue;
-      }
+      if (e.dead && e.type !== "boss") { if (e.squash > 0) e.squash -= dt; continue; }
       if (e.type === "boss" && e.hp <= 0) {
         e.deathT -= dt;
-        if (e.deathT <= 0 && !core) {
-          core = { x: e.x, y: e.y, t: 0 };
-          e.dead = true;
-        }
+        if (e.deathT <= 0 && !core) { core = { x: e.x, y: e.y, t: 0 }; e.dead = true; }
         continue;
       }
       if (e.flash > 0) e.flash -= dt;
@@ -830,7 +687,6 @@
         tryMove(e, e.knock.x, e.knock.y);
         e.knock.x *= 0.65; e.knock.y *= 0.65;
       }
-
       if (e.type === "slime") {
         const dx = player.x - e.x, dy = player.y - e.y;
         const len = Math.hypot(dx, dy) || 1;
@@ -848,23 +704,14 @@
       } else if (e.type === "boss") {
         updateBoss(e, dt);
       }
-
-      // contact damage (skip during spawn invulnerability)
       if (e.hp > 0 && !(e.spawnInvuln > 0)) {
-        const eb = enemyBox(e);
-        if (aabb(footBox(player.x, player.y), eb)) {
-          hurtPlayer(e.dmg, e);
-        }
+        if (aabb(footBox(player.x, player.y), enemyBox(e))) hurtPlayer(e.dmg, e);
       }
     }
 
-    // permanent room-clear flag (doors stay open after clear)
     if (enemies.length && roomCleared()) markRoomClearedIfDone();
-
-    // door check
     tryDoor();
 
-    // camera
     cam.x = Math.round(player.x - W / 2);
     cam.y = Math.round(player.y - H / 2);
     cam.x = Math.max(0, Math.min(cam.x, room.w * T - W));
@@ -880,17 +727,12 @@
   }
 
   function updateBoss(e, dt) {
-    // phase transition — ground warning circle, then slime appears
     if (e.hp <= 4 && e.phase === 1) {
-      e.phase = 2;
-      e.phaseFlash = 600;
-      e.speed = 48;
+      e.phase = 2; e.phaseFlash = 600; e.speed = 48;
       showToast("残阳守卫进入第二阶段！");
       if (!e.summoned) {
-        e.summoned = true;
-        e.summonWarn = 500; // landing warning ~400–600ms
-        e.summonX = e.x + 30;
-        e.summonY = e.y;
+        e.summoned = true; e.summonWarn = 500;
+        e.summonX = e.x + 30; e.summonY = e.y;
       }
     }
     if (e.phaseFlash > 0) e.phaseFlash -= dt;
@@ -905,139 +747,99 @@
         });
       }
     }
-
-    // Existing orange-eye dash telegraph (standstill then dash) — keep readable
     if (e.telegraph > 0) {
       e.telegraph -= dt;
       if (e.telegraph <= 0) {
-        const dx = player.x - e.x, dy = player.y - e.y;
-        const len = Math.hypot(dx, dy) || 1;
-        e.dash = 280;
-        e.dashVx = (dx / len) * 140;
-        e.dashVy = (dy / len) * 140;
+        const dx = player.x - e.x, dy = player.y - e.y, len = Math.hypot(dx, dy) || 1;
+        e.dash = 280; e.dashVx = (dx / len) * 140; e.dashVy = (dy / len) * 140;
       }
       return;
     }
-    if (e.dash > 0) {
-      e.dash -= dt;
-      tryMove(e, e.dashVx * dt / 1000, e.dashVy * dt / 1000);
-      return;
-    }
-
-    // P1 learnable: 蓄力停步 (wind-up standstill) → short slam lunge
-    // Distinct from dash: longer freeze + cream charge ring (no orange-eye overlay)
+    if (e.dash > 0) { e.dash -= dt; tryMove(e, e.dashVx * dt / 1000, e.dashVy * dt / 1000); return; }
     if (e.windup > 0) {
       e.windup -= dt;
       if (e.windup <= 0) {
         e.windup = 0;
-        const dx = player.x - e.x, dy = player.y - e.y;
-        const len = Math.hypot(dx, dy) || 1;
-        e.slam = 200;
-        e.slamVx = (dx / len) * 110;
-        e.slamVy = (dy / len) * 110;
+        const dx = player.x - e.x, dy = player.y - e.y, len = Math.hypot(dx, dy) || 1;
+        e.slam = 200; e.slamVx = (dx / len) * 110; e.slamVy = (dy / len) * 110;
       }
-      return; // standstill during wind-up
-    }
-    if (e.slam > 0) {
-      e.slam -= dt;
-      tryMove(e, e.slamVx * dt / 1000, e.slamVy * dt / 1000);
       return;
     }
+    if (e.slam > 0) { e.slam -= dt; tryMove(e, e.slamVx * dt / 1000, e.slamVy * dt / 1000); return; }
 
-    // chase + pick telegraphable attack (alternate dash vs wind-up)
-    const dx = player.x - e.x, dy = player.y - e.y;
-    const len = Math.hypot(dx, dy) || 1;
+    const dx = player.x - e.x, dy = player.y - e.y, len = Math.hypot(dx, dy) || 1;
     tryMove(e, (dx / len) * e.speed * dt / 1000, (dy / len) * e.speed * dt / 1000);
     e._dashCd = (e._dashCd || 0) - dt;
-    if (e._dashCd <= 0 && Math.hypot(dx, dy) < 120) {
-      e._atkAlt = !(e._atkAlt); // alternate for learnability
-      if (e._atkAlt) {
-        e.atkKind = "windup";
-        e.windup = 520; // 蓄力停步 — clearly readable freeze
-      } else {
-        e.atkKind = "dash";
-        e.telegraph = 300; // orange-eye dash telegraph (unchanged)
-      }
+    if (e._dashCd <= 0 && Math.hypot(dx, dy) < 100) {
+      e._atkAlt = !e._atkAlt;
+      if (e._atkAlt) { e.atkKind = "windup"; e.windup = 520; }
+      else { e.atkKind = "dash"; e.telegraph = 320; }
       e._dashCd = e.phase === 2 ? 1500 : 2200;
     }
   }
 
   // ─── Draw ───────────────────────────────────────────────────────────────
   function draw() {
+    Art.noSmooth(ctx);
     ctx.clearRect(0, 0, W, H);
 
-    if (mode === MODE.TITLE) {
-      drawTitle();
+    if (!assetsReady) {
+      ctx.fillStyle = "#2A1F1A";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#F5E6D3";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("加载素材…", W / 2, H / 2);
+      ctx.textAlign = "left";
       return;
     }
 
-    // world
+    if (mode === MODE.TITLE) { drawTitle(); return; }
+
     ctx.save();
     ctx.translate(-cam.x, -cam.y);
 
-    if (room.outdoor) {
-      // sky gradient in world? draw behind tiles in screen space — do after
+    if (!room.outdoor) {
+      ctx.fillStyle = "#1a2425";
+      ctx.fillRect(cam.x, cam.y, W, H);
     }
 
-    // tiles
     const x0 = Math.max(0, Math.floor(cam.x / T));
     const y0 = Math.max(0, Math.floor(cam.y / T));
     const x1 = Math.min(room.w - 1, Math.ceil((cam.x + W) / T));
     const y1 = Math.min(room.h - 1, Math.ceil((cam.y + H) / T));
-    if (room.outdoor) {
-      // fill sky in screen space later; grass already drawn
-    } else {
-      ctx.fillStyle = "#2a3a3b";
-      ctx.fillRect(cam.x, cam.y, W, H);
-    }
-
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
-        const id = room.tiles[ty * room.w + tx];
-        Art.drawTile(ctx, id, tx * T, ty * T, tx + ty * 17);
+        Art.drawTile(ctx, room.tiles[ty * room.w + tx], tx * T, ty * T, tx + ty * 17, room.outdoor);
       }
     }
 
-    // switches
-    for (const sw of switches) {
-      Art.drawSwitch(ctx, sw.x, sw.y, sw.pressed);
-    }
-
-    // props houses
+    for (const sw of switches) Art.drawSwitch(ctx, sw.x, sw.y, sw.pressed);
     for (const p of room.props || []) {
       if (p.type === "house") Art.drawHouse(ctx, p.x, p.y, p.w, p.h);
     }
-
-    // signs
     for (const s of room.signs || []) Art.drawSign(ctx, s.x, s.y);
-
-    // chests
-    for (const c of chests) Art.drawChest(ctx, c.x, c.y, c.open);
-
-    // golds / hearts / keys
+    for (const c of chests) Art.drawChest(ctx, c.x, c.y, c.open, room.outdoor);
     for (const g of golds) Art.drawCoin(ctx, g.x, g.y, Math.sin(time * 0.008) * 2);
     for (const h of hearts) Art.drawHeartPickup(ctx, h.x, h.y, time);
     for (const k of groundKeys) Art.drawKey(ctx, k.x, k.y, Math.sin(time * 0.008) * 2);
 
-    // Boss P2 summon ground warning circle
     for (const e of enemies) {
       if (e.type === "boss" && e.summonWarn > 0) {
         const pulse = 0.65 + 0.35 * Math.sin(time * 0.02);
-        ctx.save();
         ctx.strokeStyle = "rgba(244,162,97," + (0.55 + 0.35 * pulse) + ")";
         ctx.fillStyle = "rgba(244,162,97," + (0.18 * pulse) + ")";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(e.summonX, e.summonY + 4, 12 + pulse * 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
+        ctx.arc(e.summonX, e.summonY + 4, 10 + pulse * 3, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
       }
     }
 
-    // sort entities by y
     const ents = [];
-    for (const n of room.npcs || []) ents.push({ y: n.y, draw: () => Art.drawNpc(ctx, n.x, n.y, n.kind, n.flash && !flags.metElder) });
+    for (const n of room.npcs || []) {
+      ents.push({ y: n.y, draw: () => Art.drawNpc(ctx, n.x, n.y, n.kind, n.flash && !flags.metElder) });
+    }
     for (const e of enemies) {
       if (e.dead && e.type === "slime" && e.squash <= 0) continue;
       if (e.dead && e.type === "boss" && e.deathT <= 0) continue;
@@ -1047,12 +849,7 @@
           if (e.type === "slime") Art.drawSlime(ctx, e.x, e.y, !room.outdoor, e.squash > 0, e.flash > 0);
           else if (e.type === "stone") Art.drawStone(ctx, e.x, e.y, e.flash > 0);
           else if (e.type === "boss") {
-            // telegraph drawn ON TOP of boss body inside drawBoss (flash orange enlarge)
-            Art.drawBoss(
-              ctx, e.x, e.y, e.phase,
-              e.flash > 0 || e.phaseFlash > 0, e.hp <= 0,
-              e.telegraph > 0, time, e.windup > 0
-            );
+            Art.drawBoss(ctx, e.x, e.y, e.phase, e.flash > 0 || e.phaseFlash > 0, e.hp <= 0, e.telegraph > 0, time, e.windup > 0);
           }
         },
       });
@@ -1060,63 +857,38 @@
     if (core) ents.push({ y: core.y, draw: () => Art.drawCore(ctx, core.x, core.y, time) });
     ents.push({
       y: player.y,
-      draw: () => Art.drawHero(
+      draw: () => Art.drawHeroIdle(
         ctx, player.x, player.y, player.dir, player.walkFrame,
-        player.swingT < 0 ? 0 : player.swingT,
-        player.hurtFlash > 0,
-        false
+        moving, player.swingT >= 0, player.hurtFlash > 0
       ),
     });
     ents.sort((a, b) => a.y - b.y);
     for (const e of ents) e.draw();
-
     ctx.restore();
 
-    // outdoor sky vignette top
-    if (room && room.outdoor) {
-      const g = ctx.createLinearGradient(0, 0, 0, 48);
-      g.addColorStop(0, "rgba(255,232,200,0.35)");
-      g.addColorStop(1, "rgba(255,232,200,0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, W, 48);
-    }
-
-    // HUD — temple key and boss key shown separately
     if (mode !== MODE.TITLE) {
-      Art.drawHUD(
-        ctx,
-        player.hp,
-        player.maxHp,
-        player.keys,
-        player.bossKeys,
-        player.gold,
-        questOn && !flags.ending ? "目标：取回晨光核" : ""
-      );
+      Art.drawHUD(ctx, player.hp, player.maxHp, player.keys, player.bossKeys, player.gold,
+        questOn && !flags.ending ? "目标：取回晨光核" : "");
     }
-
     if (mode === MODE.DIALOG && dialog) {
       Art.drawDialog(ctx, dialog.name, dialog.lines[dialog.i] || "");
     }
-
     if (toast) {
-      ctx.fillStyle = "rgba(42,31,26,0.7)";
-      ctx.fillRect(W / 2 - 120, 40, 240, 28);
+      ctx.fillStyle = "rgba(42,31,26,0.75)";
+      ctx.fillRect(W / 2 - 90, 28, 180, 18);
       ctx.fillStyle = "#F5E6D3";
-      ctx.font = "13px sans-serif";
+      ctx.font = "8px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(toast.text, W / 2, 58);
+      ctx.fillText(toast.text, W / 2, 40);
       ctx.textAlign = "left";
     }
-
     if (mode === MODE.END) {
-      Art.drawPanel(ctx, "早晨回来了", "晨光核归位。村子又吵又暖。——通关", ["再走一程", "回村闲逛"]);
+      Art.drawPanel(ctx, "早晨回来了", "晨光核归位。——通关", ["再走一程", "回村闲逛"]);
     }
-
     if (mode === MODE.DEAD) {
       ctx.fillStyle = "rgba(42,31,26,0.55)";
       ctx.fillRect(0, 0, W, H);
     }
-
     if (fade > 0) {
       ctx.fillStyle = "rgba(42,31,26," + Math.min(1, fade) + ")";
       ctx.fillRect(0, 0, W, H);
@@ -1124,74 +896,64 @@
   }
 
   function drawTitle() {
-    // sky
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#FFE8C8");
     g.addColorStop(1, "#F4A261");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "rgba(42,31,26,0.25)";
-    ctx.beginPath();
-    ctx.moveTo(0, 260); ctx.lineTo(120, 200); ctx.lineTo(280, 250); ctx.lineTo(400, 190); ctx.lineTo(640, 240); ctx.lineTo(640, 360); ctx.lineTo(0, 360);
-    ctx.fill();
-    Art.drawHero(ctx, 320, 150, 0, 0, 0, false, true);
+    if (Art.imgs.warrior) {
+      Art.drawHeroIdle(ctx, W / 2, 78, 0, (time / 200 | 0) % 3, false, false, false);
+    }
     ctx.fillStyle = "#2A1F1A";
-    ctx.font = "bold 32px sans-serif";
+    ctx.font = "bold 18px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("《晨光神殿》", 320, 60);
-    ctx.font = "14px sans-serif";
+    ctx.fillText("《晨光神殿》", W / 2, 36);
+    ctx.font = "9px sans-serif";
     ctx.fillStyle = "#6F4E37";
-    ctx.fillText("取回晨光核", 320, 86);
+    ctx.fillText("取回晨光核", W / 2, 50);
 
     const btns = hasSave() ? ["新游戏", "继续"] : ["新游戏"];
     panelBtns = btns;
     btns.forEach((b, i) => {
-      const bw = 140, bh = 36;
-      const bx = 320 - bw / 2;
-      const by = 220 + i * 48;
+      const bw = 100, bh = 22;
+      const bx = W / 2 - bw / 2, by = 108 + i * 28;
       ctx.fillStyle = "#F4A261";
-      roundRectPath(ctx, bx, by, bw, bh, 6);
-      ctx.fill();
+      ctx.fillRect(bx, by, bw, bh);
       ctx.strokeStyle = "#2A1F1A";
-      ctx.stroke();
+      ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
       ctx.fillStyle = "#F5E6D3";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText(b, 320, by + 24);
+      ctx.font = "bold 10px sans-serif";
+      ctx.fillText(b, W / 2, by + 15);
     });
-    ctx.font = "11px sans-serif";
-    ctx.fillStyle = "rgba(42,31,26,0.7)";
-    ctx.fillText(hasSave() ? "空格：继续　点击可选新游戏" : "WASD/方向移动 · J/Z/空格挥剑 · E对话", 320, 340);
+    ctx.font = "7px sans-serif";
+    ctx.fillStyle = "rgba(42,31,26,0.75)";
+    ctx.fillText("WASD移动 · J/Z挥剑 · E对话", W / 2, H - 22);
+    ctx.fillText("Art: Kenney.nl · Characters: Shade (Puny)", W / 2, H - 10);
     ctx.textAlign = "left";
   }
 
-  function roundRectPath(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-
-  // ─── Input ──────────────────────────────────────────────────────────────
+  // ─── Input — attack vs dialog separated ─────────────────────────────────
   window.addEventListener("keydown", (e) => {
     keys[e.key] = true;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Spacebar"].includes(e.key)) e.preventDefault();
-    if (e.key === "e" || e.key === "E" || e.key === "Enter") {
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+
+    // Dialog / confirm: E Enter Space Escape — never swing
+    if (e.key === "e" || e.key === "E" || e.key === "Enter" || e.key === "Escape") {
       if (mode === MODE.DIALOG) advanceDialog();
       else if (mode === MODE.PLAY) interact();
+      return;
     }
     if (e.key === " " || e.key === "Spacebar") {
-      if (mode === MODE.DIALOG) { advanceDialog(); e.preventDefault(); }
-      else if (mode === MODE.PLAY && hasSword) { atkQueued = true; e.preventDefault(); }
-      else if (mode === MODE.TITLE) {
-        // Continue if save exists — Space must not only New Game
-        clickTitle(hasSave() ? 1 : 0);
-      }
+      e.preventDefault();
+      if (mode === MODE.DIALOG) advanceDialog();
+      else if (mode === MODE.TITLE) clickTitle(hasSave() ? 1 : 0);
+      else if (mode === MODE.PLAY) interact(); // Space = confirm/talk, NOT attack
+      return;
     }
-    if ((e.key === "j" || e.key === "J" || e.key === "z" || e.key === "Z") && mode === MODE.PLAY) atkQueued = true;
-    if (e.key === "Escape" && mode === MODE.DIALOG) advanceDialog();
+    // Attack only
+    if ((e.key === "j" || e.key === "J" || e.key === "z" || e.key === "Z") && mode === MODE.PLAY) {
+      atkQueued = true;
+    }
   });
   window.addEventListener("keyup", (e) => { keys[e.key] = false; });
 
@@ -1202,18 +964,17 @@
     if (mode === MODE.TITLE) {
       const btns = hasSave() ? ["新游戏", "继续"] : ["新游戏"];
       btns.forEach((b, i) => {
-        const bx = 320 - 70, by = 220 + i * 48;
-        if (sx >= bx && sx <= bx + 140 && sy >= by && sy <= by + 36) clickTitle(i);
+        const bx = W / 2 - 50, by = 108 + i * 28;
+        if (sx >= bx && sx <= bx + 100 && sy >= by && sy <= by + 22) clickTitle(i);
       });
       return;
     }
     if (mode === MODE.END) {
-      // 再走一程 / 回村闲逛
-      const by0 = (360 - 160) / 2 + 160 - 52 - 42;
-      const by1 = (360 - 160) / 2 + 160 - 52;
-      if (sx >= 250 && sx <= 390) {
-        if (sy >= by0 && sy <= by0 + 36) { newGame(); }
-        else if (sy >= by1 && sy <= by1 + 36) {
+      const pw = 200, ph = 110, py = (H - ph) / 2;
+      const by0 = py + ph - 52, by1 = py + ph - 28;
+      if (sx >= W / 2 - 60 && sx <= W / 2 + 60) {
+        if (sy >= by0 && sy <= by0 + 20) newGame();
+        else if (sy >= by1 && sy <= by1 + 20) {
           enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
           mode = MODE.PLAY;
           save();
@@ -1221,10 +982,7 @@
       }
       return;
     }
-    if (mode === MODE.DIALOG) {
-      advanceDialog();
-      return;
-    }
+    if (mode === MODE.DIALOG) { advanceDialog(); return; }
     if (mode === MODE.PLAY) interact();
   });
 
@@ -1232,14 +990,12 @@
     if (i === 0) newGame();
     else {
       const data = loadRaw();
-      if (data) {
-        applySave(data);
-        mode = MODE.PLAY;
-      } else newGame();
+      if (data) { applySave(data); mode = MODE.PLAY; }
+      else newGame();
     }
   }
 
-  // Touch controls
+  // Touch
   const touchUI = document.getElementById("touch");
   const stick = document.getElementById("stick");
   const knob = document.getElementById("knob");
@@ -1254,15 +1010,12 @@
   let stickTouchId = null;
   stick.addEventListener("touchstart", (e) => {
     e.preventDefault();
-    const t = e.changedTouches[0];
-    stickTouchId = t.identifier;
-    moveStick(t);
+    stickTouchId = e.changedTouches[0].identifier;
+    moveStick(e.changedTouches[0]);
   }, { passive: false });
   stick.addEventListener("touchmove", (e) => {
     e.preventDefault();
-    for (const t of e.changedTouches) {
-      if (t.identifier === stickTouchId) moveStick(t);
-    }
+    for (const t of e.changedTouches) if (t.identifier === stickTouchId) moveStick(t);
   }, { passive: false });
   function endStick(e) {
     for (const t of e.changedTouches) {
@@ -1278,17 +1031,20 @@
 
   function moveStick(t) {
     const r = stick.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     let dx = t.clientX - cx, dy = t.clientY - cy;
     const max = r.width * 0.35;
     const len = Math.hypot(dx, dy) || 1;
     if (len > max) { dx = dx / len * max; dy = dy / len * max; }
     knob.style.transform = "translate(" + dx + "px," + dy + "px)";
-    touchAxis.x = dx / max;
-    touchAxis.y = dy / max;
-    if (Math.abs(touchAxis.x) < 0.25) touchAxis.x = 0;
-    if (Math.abs(touchAxis.y) < 0.25) touchAxis.y = 0;
+    let ax = dx / max, ay = dy / max;
+    if (Math.hypot(ax, ay) < STICK_DEAD) { ax = 0; ay = 0; }
+    else {
+      // renormalize after deadzone
+      const L = Math.hypot(ax, ay) || 1;
+      ax /= L; ay /= L;
+    }
+    touchAxis.x = ax; touchAxis.y = ay;
   }
 
   btnSword.addEventListener("touchstart", (e) => {
@@ -1309,12 +1065,17 @@
     let dt = now - last;
     last = now;
     if (dt > 50) dt = 50;
-    update(dt);
+    if (assetsReady) update(dt);
     draw();
     requestAnimationFrame(frame);
   }
 
-  // boot
   player = defaultPlayer();
+  Art.loadAll().then(() => {
+    assetsReady = true;
+  }).catch((err) => {
+    console.error(err);
+    assetsReady = true; // allow fallback draw
+  });
   requestAnimationFrame(frame);
 })();

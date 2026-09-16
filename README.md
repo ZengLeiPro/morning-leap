@@ -48,11 +48,12 @@ npx --yes serve .
 祝你晨光里飞得更远 ☕
 
 
-## 《晨光神殿》（Zelda-like）
+## 《晨光神殿》（手感片）
 
-俯视 RPG 小品，路径：[`temple/`](./temple/)。Canvas **640×360**，对齐 `temple/docs/GDD-zeldalike-v1.1.md`。
+俯视 RPG 小品，路径：[`temple/`](./temple/)。逻辑画布 **320×180** nearest 整数倍，方案 B（Kenney Tiny Town/Dungeon + Puny），对齐 `temple/docs/GDD-feel-slice-v1.md`。
 
 - 打开 `temple/index.html`，或：`python3 -m http.server 8080` 后访问 `/temple/`
 - GitHub Pages：https://zengleipro.github.io/morning-leap/temple/
-- 操作：WASD/方向移动，J/Z/空格挥剑，E 对话；触屏有虚拟摇杆与剑键
-- 存档：`localStorage` 键名 `morning-temple-save`
+- 操作：WASD/方向移动，**J/Z 挥剑**，**E/空格 对话**（键分离）；触屏摇杆（死区）+ 剑 / 谈
+- 内容：村小片 + 三房（门厅→钥室→Boss）；存档键 `morning-temple-save`
+- Credits：Art Kenney.nl · Characters Shade (Puny)

@@ -15,12 +15,14 @@ html, body {
   align-items: center;
   justify-content: center;
 }
+/* Size set by JS to integer nearest scale only — no CSS aspect stretch */
 #game {
   display: block;
-  width: min(100vw, calc(100vh * 640 / 360));
-  height: min(100vh, calc(100vw * 360 / 640));
+  width: 320px;
+  height: 180px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
   background: #2A1F1A;
   touch-action: none;
 }
