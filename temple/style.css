@@ -15,22 +15,228 @@ html, body {
   align-items: center;
   justify-content: center;
 }
-/* Size set by JS to integer nearest scale only — no CSS aspect stretch */
-#game {
-  display: block;
+/* Integer nearest scale box — JS sets width/height in whole pixels only */
+#stage {
+  position: relative;
   width: 320px;
   height: 180px;
+  flex-shrink: 0;
+  /* --ui-scale set by JS; never use non-integer CSS transform scale on overlays */
+}
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   -ms-interpolation-mode: nearest-neighbor;
   background: #2A1F1A;
   touch-action: none;
 }
+.ui-overlay {
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+.ui-layer { position: absolute; inset: 0; }
+.hidden { display: none !important; }
+
+.ui-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F5E6D3;
+  font-size: calc(var(--ui-scale, 1) * 10px);
+  font-weight: 600;
+  background: #2A1F1A;
+}
+
+.ui-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.ui-title-name {
+  margin-top: calc(var(--ui-scale, 1) * 22px);
+  color: #2A1F1A;
+  font-size: calc(var(--ui-scale, 1) * 18px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(245, 230, 211, 0.35);
+}
+.ui-title-sub {
+  margin-top: calc(var(--ui-scale, 1) * 4px);
+  color: #6F4E37;
+  font-size: calc(var(--ui-scale, 1) * 9px);
+  font-weight: 600;
+}
+.ui-title-btns {
+  margin-top: calc(var(--ui-scale, 1) * 52px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ui-scale, 1) * 6px);
+  align-items: center;
+  pointer-events: auto;
+}
+.ui-btn {
+  width: calc(var(--ui-scale, 1) * 100px);
+  height: calc(var(--ui-scale, 1) * 22px);
+  border: 2px solid #2A1F1A;
+  border-radius: 2px;
+  background: #F4A261;
+  color: #F5E6D3;
+  font: inherit;
+  font-size: calc(var(--ui-scale, 1) * 10px);
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-btn:active { background: #E76F51; }
+.ui-title-hint {
+  position: absolute;
+  bottom: calc(var(--ui-scale, 1) * 22px);
+  color: rgba(42, 31, 26, 0.75);
+  font-size: calc(var(--ui-scale, 1) * 7px);
+}
+.ui-title-credit {
+  position: absolute;
+  bottom: calc(var(--ui-scale, 1) * 8px);
+  color: rgba(42, 31, 26, 0.75);
+  font-size: calc(var(--ui-scale, 1) * 7px);
+}
+
+.ui-hud { pointer-events: none; }
+.ui-hud-stats {
+  position: absolute;
+  top: calc(var(--ui-scale, 1) * 2px);
+  right: calc(var(--ui-scale, 1) * 2px);
+  min-width: calc(var(--ui-scale, 1) * 76px);
+  padding: calc(var(--ui-scale, 1) * 3px) calc(var(--ui-scale, 1) * 6px);
+  background: rgba(42, 31, 26, 0.75);
+  color: #F5E6D3;
+  font-size: calc(var(--ui-scale, 1) * 8px);
+  font-weight: 600;
+  line-height: 1.35;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.ui-hud-quest {
+  position: absolute;
+  top: calc(var(--ui-scale, 1) * 18px);
+  left: calc(var(--ui-scale, 1) * 6px);
+  padding: calc(var(--ui-scale, 1) * 2px) calc(var(--ui-scale, 1) * 6px);
+  background: rgba(42, 31, 26, 0.65);
+  color: #F5E6D3;
+  font-size: calc(var(--ui-scale, 1) * 8px);
+  font-weight: 600;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.ui-toast {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: calc(var(--ui-scale, 1) * 28px);
+}
+.ui-toast:not(.hidden) {
+  display: flex;
+}
+.ui-toast-msg {
+  max-width: 90%;
+  padding: calc(var(--ui-scale, 1) * 4px) calc(var(--ui-scale, 1) * 10px);
+  background: rgba(42, 31, 26, 0.75);
+  color: #F5E6D3;
+  font-size: calc(var(--ui-scale, 1) * 8px);
+  font-weight: 600;
+  text-align: center;
+  border-radius: 2px;
+  line-height: 1.35;
+}
+
+.ui-dialog { display: flex; align-items: flex-end; justify-content: center; }
+.ui-dialog:not(.hidden) { display: flex; }
+.ui-dialog-box {
+  position: relative;
+  width: calc(100% - var(--ui-scale, 1) * 16px);
+  margin-bottom: calc(var(--ui-scale, 1) * 6px);
+  min-height: calc(var(--ui-scale, 1) * 48px);
+  padding: calc(var(--ui-scale, 1) * 8px) calc(var(--ui-scale, 1) * 10px) calc(var(--ui-scale, 1) * 14px);
+  background: rgba(42, 31, 26, 0.88);
+  border: 2px solid #F4A261;
+  border-radius: 2px;
+  pointer-events: auto;
+}
+.ui-dialog-name {
+  color: #F4A261;
+  font-size: calc(var(--ui-scale, 1) * 9px);
+  font-weight: 700;
+  margin-bottom: calc(var(--ui-scale, 1) * 4px);
+}
+.ui-dialog-body {
+  color: #F5E6D3;
+  font-size: calc(var(--ui-scale, 1) * 9px);
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ui-dialog-hint {
+  position: absolute;
+  right: calc(var(--ui-scale, 1) * 8px);
+  bottom: calc(var(--ui-scale, 1) * 4px);
+  color: rgba(245, 230, 211, 0.6);
+  font-size: calc(var(--ui-scale, 1) * 8px);
+}
+
+.ui-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(42, 31, 26, 0.72);
+}
+.ui-end:not(.hidden) { display: flex; }
+.ui-end-panel {
+  width: calc(var(--ui-scale, 1) * 200px);
+  padding: calc(var(--ui-scale, 1) * 16px) calc(var(--ui-scale, 1) * 12px) calc(var(--ui-scale, 1) * 14px);
+  background: #2A1F1A;
+  border: 2px solid #F4A261;
+  border-radius: 2px;
+  text-align: center;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--ui-scale, 1) * 8px);
+}
+.ui-end-title {
+  color: #F5E6D3;
+  font-size: calc(var(--ui-scale, 1) * 12px);
+  font-weight: 800;
+}
+.ui-end-sub {
+  color: #F4A261;
+  font-size: calc(var(--ui-scale, 1) * 8px);
+  font-weight: 600;
+  margin-bottom: calc(var(--ui-scale, 1) * 4px);
+}
+.ui-end .ui-btn {
+  width: calc(var(--ui-scale, 1) * 120px);
+  height: calc(var(--ui-scale, 1) * 20px);
+  font-size: calc(var(--ui-scale, 1) * 9px);
+  color: #2A1F1A;
+}
+
 .touch-ui {
   position: absolute;
   inset: 0;
   pointer-events: none;
   display: none;
+  z-index: 3;
 }
 .touch-ui.show { display: block; }
 .stick {

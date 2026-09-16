@@ -31,6 +31,19 @@
     }
   }
 
+
+  /** ≥1 tile visual margin below border so bottom decoration isn't flush-cut by the viewport */
+  function appendBottomPad(room, fillId, wallId) {
+    const w = room.w, h = room.h;
+    const tiles = room.tiles.slice();
+    for (let x = 0; x < w; x++) {
+      const id = (x === 0 || x === w - 1) ? wallId : fillId;
+      tiles.push(id);
+    }
+    room.h = h + 1;
+    room.tiles = tiles;
+  }
+
   function punchDoor(tiles, w, d) {
     for (let i = 0; i < (d.w || 1); i++) {
       for (let j = 0; j < (d.h || 1); j++) {
@@ -231,7 +244,13 @@
   punchDoor(T2.tiles, T2.w, T2.doors[0]);
   punchDoor(T3.tiles, T3.w, T3.doors[0]);
 
-  const ROOMS = { village: buildVillage(), T1, T2, T3 };
+  const village = buildVillage();
+  appendBottomPad(village, 1, 4);
+  appendBottomPad(T1, 3, 5);
+  appendBottomPad(T2, 3, 5);
+  appendBottomPad(T3, 3, 5);
+
+  const ROOMS = { village, T1, T2, T3 };
 
   const SOLID = { 0: 1, 4: 1, 5: 1, 8: 1 };
 

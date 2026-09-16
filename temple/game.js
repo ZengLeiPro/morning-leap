@@ -18,10 +18,23 @@
   const STICK_DEAD = 0.28;
 
   const canvas = document.getElementById("game");
+  const stage = document.getElementById("stage");
   const ctx = canvas.getContext("2d");
   canvas.width = W;
   canvas.height = H;
   Art.noSmooth(ctx);
+
+  const uiLoading = document.getElementById("ui-loading");
+  const uiTitle = document.getElementById("ui-title");
+  const uiTitleBtns = document.getElementById("ui-title-btns");
+  const uiHud = document.getElementById("ui-hud");
+  const uiHudStats = document.getElementById("ui-hud-stats");
+  const uiHudQuest = document.getElementById("ui-hud-quest");
+  const uiToast = document.getElementById("ui-toast");
+  const uiDialog = document.getElementById("ui-dialog");
+  const uiDialogName = document.getElementById("ui-dialog-name");
+  const uiDialogBody = document.getElementById("ui-dialog-body");
+  const uiEnd = document.getElementById("ui-end");
 
   const MODE = { TITLE: "title", PLAY: "play", DIALOG: "dialog", FADE: "fade", END: "end", DEAD: "dead" };
 
@@ -74,17 +87,84 @@
     };
   }
 
-  // ─── Integer nearest scale ──────────────────────────────────────────────
+  // ─── Integer nearest scale (stage box; overlays match, no CSS transform) ─
   function fitCanvas() {
     const sx = Math.floor(window.innerWidth / W);
     const sy = Math.floor(window.innerHeight / H);
     const scale = Math.max(1, Math.min(sx, sy));
-    canvas.style.width = (W * scale) + "px";
-    canvas.style.height = (H * scale) + "px";
+    const pw = W * scale, ph = H * scale;
+    stage.style.width = pw + "px";
+    stage.style.height = ph + "px";
+    stage.style.setProperty("--ui-scale", String(scale));
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     canvas.style.imageRendering = "pixelated";
   }
   window.addEventListener("resize", fitCanvas);
   fitCanvas();
+
+  function setHidden(el, hidden) {
+    if (!el) return;
+    el.classList.toggle("hidden", !!hidden);
+  }
+
+  let titleBtnKey = "";
+  function rebuildTitleButtons() {
+    const btns = hasSave() ? ["新游戏", "继续"] : ["新游戏"];
+    const key = btns.join("|");
+    if (key === titleBtnKey && uiTitleBtns.childElementCount === btns.length) {
+      panelBtns = btns;
+      return;
+    }
+    titleBtnKey = key;
+    panelBtns = btns;
+    uiTitleBtns.innerHTML = "";
+    btns.forEach((label, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "ui-btn";
+      b.textContent = label;
+      b.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        clickTitle(i);
+      });
+      uiTitleBtns.appendChild(b);
+    });
+  }
+
+  /** Sharp HTML overlays for Chinese UI — pixel world stays on canvas */
+  function syncUI() {
+    setHidden(uiLoading, assetsReady);
+    const showTitle = assetsReady && mode === MODE.TITLE;
+    setHidden(uiTitle, !showTitle);
+    if (showTitle) rebuildTitleButtons();
+
+    const showHud = assetsReady && mode !== MODE.TITLE && player;
+    setHidden(uiHud, !showHud);
+    if (showHud) {
+      uiHudStats.textContent = "金" + player.gold + " 钥" + player.keys + " B" + player.bossKeys;
+      const quest = questOn && !flags.ending ? "目标：取回晨光核" : "";
+      uiHudQuest.textContent = quest;
+      setHidden(uiHudQuest, !quest);
+    }
+
+    const showToast = !!(toast && toast.text && mode !== MODE.TITLE);
+    setHidden(uiToast, !showToast);
+    if (showToast) {
+      uiToast.innerHTML = '<div class="ui-toast-msg"></div>';
+      uiToast.querySelector(".ui-toast-msg").textContent = toast.text;
+    }
+
+    const showDialog = mode === MODE.DIALOG && dialog;
+    setHidden(uiDialog, !showDialog);
+    if (showDialog) {
+      uiDialogName.textContent = dialog.name || "";
+      uiDialogBody.textContent = dialog.lines[dialog.i] || "";
+    }
+
+    setHidden(uiEnd, mode !== MODE.END);
+  }
 
   // ─── Save / Load ────────────────────────────────────────────────────────
   function serialize() {
@@ -712,6 +792,7 @@
     if (enemies.length && roomCleared()) markRoomClearedIfDone();
     tryDoor();
 
+    // Maps append ≥1 bottom pad tile so south decoration isn't flush-cut
     cam.x = Math.round(player.x - W / 2);
     cam.y = Math.round(player.y - H / 2);
     cam.x = Math.max(0, Math.min(cam.x, room.w * T - W));
@@ -782,15 +863,11 @@
   function draw() {
     Art.noSmooth(ctx);
     ctx.clearRect(0, 0, W, H);
+    syncUI();
 
     if (!assetsReady) {
       ctx.fillStyle = "#2A1F1A";
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#F5E6D3";
-      ctx.font = "10px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("加载素材…", W / 2, H / 2);
-      ctx.textAlign = "left";
       return;
     }
 
@@ -867,24 +944,9 @@
     ctx.restore();
 
     if (mode !== MODE.TITLE) {
-      Art.drawHUD(ctx, player.hp, player.maxHp, player.keys, player.bossKeys, player.gold,
-        questOn && !flags.ending ? "目标：取回晨光核" : "");
+      Art.drawHUD(ctx, player.hp, player.maxHp);
     }
-    if (mode === MODE.DIALOG && dialog) {
-      Art.drawDialog(ctx, dialog.name, dialog.lines[dialog.i] || "");
-    }
-    if (toast) {
-      ctx.fillStyle = "rgba(42,31,26,0.75)";
-      ctx.fillRect(W / 2 - 90, 28, 180, 18);
-      ctx.fillStyle = "#F5E6D3";
-      ctx.font = "8px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(toast.text, W / 2, 40);
-      ctx.textAlign = "left";
-    }
-    if (mode === MODE.END) {
-      Art.drawPanel(ctx, "早晨回来了", "晨光核归位。——通关", ["再走一程", "回村闲逛"]);
-    }
+    // dialog / toast / ending copy → HTML overlays (syncUI)
     if (mode === MODE.DEAD) {
       ctx.fillStyle = "rgba(42,31,26,0.55)";
       ctx.fillRect(0, 0, W, H);
@@ -904,32 +966,7 @@
     if (Art.imgs.warrior) {
       Art.drawHeroIdle(ctx, W / 2, 78, 0, (time / 200 | 0) % 3, false, false, false);
     }
-    ctx.fillStyle = "#2A1F1A";
-    ctx.font = "bold 18px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("《晨光神殿》", W / 2, 36);
-    ctx.font = "9px sans-serif";
-    ctx.fillStyle = "#6F4E37";
-    ctx.fillText("取回晨光核", W / 2, 50);
-
-    const btns = hasSave() ? ["新游戏", "继续"] : ["新游戏"];
-    panelBtns = btns;
-    btns.forEach((b, i) => {
-      const bw = 100, bh = 22;
-      const bx = W / 2 - bw / 2, by = 108 + i * 28;
-      ctx.fillStyle = "#F4A261";
-      ctx.fillRect(bx, by, bw, bh);
-      ctx.strokeStyle = "#2A1F1A";
-      ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
-      ctx.fillStyle = "#F5E6D3";
-      ctx.font = "bold 10px sans-serif";
-      ctx.fillText(b, W / 2, by + 15);
-    });
-    ctx.font = "7px sans-serif";
-    ctx.fillStyle = "rgba(42,31,26,0.75)";
-    ctx.fillText("WASD移动 · J/Z挥剑 · E对话", W / 2, H - 22);
-    ctx.fillText("Art: Kenney.nl · Characters: Shade (Puny)", W / 2, H - 10);
-    ctx.textAlign = "left";
+    // Title / buttons / hints → sharp HTML overlay
   }
 
   // ─── Input — attack vs dialog separated ─────────────────────────────────
@@ -957,33 +994,30 @@
   });
   window.addEventListener("keyup", (e) => { keys[e.key] = false; });
 
-  canvas.addEventListener("click", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const sx = (e.clientX - rect.left) * (W / rect.width);
-    const sy = (e.clientY - rect.top) * (H / rect.height);
-    if (mode === MODE.TITLE) {
-      const btns = hasSave() ? ["新游戏", "继续"] : ["新游戏"];
-      btns.forEach((b, i) => {
-        const bx = W / 2 - 50, by = 108 + i * 28;
-        if (sx >= bx && sx <= bx + 100 && sy >= by && sy <= by + 22) clickTitle(i);
-      });
-      return;
-    }
-    if (mode === MODE.END) {
-      const pw = 200, ph = 110, py = (H - ph) / 2;
-      const by0 = py + ph - 52, by1 = py + ph - 28;
-      if (sx >= W / 2 - 60 && sx <= W / 2 + 60) {
-        if (sy >= by0 && sy <= by0 + 20) newGame();
-        else if (sy >= by1 && sy <= by1 + 20) {
-          enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
-          mode = MODE.PLAY;
-          save();
-        }
-      }
-      return;
-    }
+  canvas.addEventListener("click", () => {
+    if (mode === MODE.TITLE || mode === MODE.END) return; // HTML buttons
     if (mode === MODE.DIALOG) { advanceDialog(); return; }
     if (mode === MODE.PLAY) interact();
+  });
+
+  uiEnd.querySelectorAll("[data-end]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (mode !== MODE.END) return;
+      const act = btn.getAttribute("data-end");
+      if (act === "new") newGame();
+      else if (act === "village") {
+        enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
+        mode = MODE.PLAY;
+        save();
+      }
+    });
+  });
+
+  uiDialog.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    if (mode === MODE.DIALOG) advanceDialog();
   });
 
   function clickTitle(i) {

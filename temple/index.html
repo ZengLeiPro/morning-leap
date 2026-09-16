@@ -10,7 +10,39 @@
 </head>
 <body>
   <div id="wrap">
-    <canvas id="game" width="320" height="180" aria-label="晨光神殿游戏画布"></canvas>
+    <div id="stage">
+      <canvas id="game" width="320" height="180" aria-label="晨光神殿游戏画布"></canvas>
+      <div id="ui" class="ui-overlay" aria-live="polite">
+        <div id="ui-loading" class="ui-layer ui-loading">加载素材…</div>
+        <div id="ui-title" class="ui-layer ui-title hidden">
+          <h1 class="ui-title-name">《晨光神殿》</h1>
+          <p class="ui-title-sub">取回晨光核</p>
+          <div id="ui-title-btns" class="ui-title-btns"></div>
+          <p class="ui-title-hint">WASD移动 · J/Z挥剑 · E对话</p>
+          <p class="ui-title-credit">Art: Kenney.nl · Characters: Shade (Puny)</p>
+        </div>
+        <div id="ui-hud" class="ui-layer ui-hud hidden">
+          <div id="ui-hud-stats" class="ui-hud-stats"></div>
+          <div id="ui-hud-quest" class="ui-hud-quest hidden"></div>
+        </div>
+        <div id="ui-toast" class="ui-layer ui-toast hidden"></div>
+        <div id="ui-dialog" class="ui-layer ui-dialog hidden">
+          <div class="ui-dialog-box">
+            <div id="ui-dialog-name" class="ui-dialog-name"></div>
+            <div id="ui-dialog-body" class="ui-dialog-body"></div>
+            <div class="ui-dialog-hint">E / 谈 继续</div>
+          </div>
+        </div>
+        <div id="ui-end" class="ui-layer ui-end hidden">
+          <div class="ui-end-panel">
+            <h2 class="ui-end-title">早晨回来了</h2>
+            <p class="ui-end-sub">晨光核归位。——通关</p>
+            <button type="button" class="ui-btn" data-end="new">再走一程</button>
+            <button type="button" class="ui-btn" data-end="village">回村闲逛</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="touch" class="touch-ui" aria-hidden="true">
       <div id="stick" class="stick">
         <div id="knob" class="knob"></div>

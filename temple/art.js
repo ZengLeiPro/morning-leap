@@ -392,10 +392,9 @@
     ctx.restore();
   }
 
-  function drawHUD(ctx, hp, maxHp, keys, bossKeys, gold, quest) {
+  /** Pixel hearts only — Chinese HUD text lives on sharp HTML overlay */
+  function drawHUD(ctx, hp, maxHp) {
     noSmooth(ctx);
-    const W = ctx.canvas.width;
-    // hearts
     for (let i = 0; i < maxHp; i++) {
       const filled = i < Math.ceil(hp);
       const hx = 6 + i * 12;
@@ -412,19 +411,6 @@
         ctx.fillStyle = filled ? "#E76F51" : "rgba(42,31,26,0.4)";
         ctx.fillRect(hx, hy, 9, 8);
       }
-    }
-    ctx.fillStyle = "#F5E6D3";
-    ctx.font = "8px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(42,31,26,0.75)";
-    ctx.fillRect(W - 78, 2, 76, 22);
-    ctx.fillStyle = "#F5E6D3";
-    ctx.fillText("金" + gold + " 钥" + keys + " B" + bossKeys, W - 74, 11);
-    if (quest) {
-      ctx.fillStyle = "rgba(42,31,26,0.65)";
-      ctx.fillRect(6, 18, 110, 12);
-      ctx.fillStyle = "#F5E6D3";
-      ctx.fillText(quest, 10, 27);
     }
   }
 
