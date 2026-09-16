@@ -1,3 +1,6 @@
+<!-- DEPRECATED / ARCHIVED：五房扩图或旧矢量规范。权威文档仅 GDD-feel-slice-v1.md + art-slice-index-B-v1.md。勿再按本文开发。归档于 2026-09-16。 -->
+> **已废止**：请改读 `docs/GDD-feel-slice-v1.md`（手感片三房）。
+
 # 《晨光飞跃》一页纸 GDD（定稿 v1）
 
 > 产品确认：2026-09-16 · 对齐美术规范 v1.1 · 目标约 8:00（Asia/Shanghai）前浏览器可玩 MVP

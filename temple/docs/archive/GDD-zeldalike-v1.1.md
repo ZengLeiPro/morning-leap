@@ -1,3 +1,6 @@
+<!-- DEPRECATED / ARCHIVED：五房扩图或旧矢量规范。权威文档仅 GDD-feel-slice-v1.md + art-slice-index-B-v1.md。勿再按本文开发。归档于 2026-09-16。 -->
+> **已废止**：请改读 `docs/GDD-feel-slice-v1.md`（手感片三房）。
+
 # 《晨光神殿》一页纸 GDD（塞尔达式俯视 RPG · MVP）
 
 > 产品切片：村 + 短神殿 + Boss 通关 · 画布 640×360 · 瓦片 16×16 · 对齐 art-spec-zeldalike-v1  
