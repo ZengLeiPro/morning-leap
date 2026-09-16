@@ -32,10 +32,10 @@
     1: 0,
     2: 0,
     3: 0,   // floor
-    4: 1,
-    5: 1,   // wall
-    6: 10,  // door open
-    7: 9,   // door locked
+    4: 14,
+    5: 14,  // solid wall (Kenney 14; avoid corner scraps 1–6)
+    6: 10,  // door open — arch 10 (alt doorway 22)
+    7: 9,   // door locked — arch 9 (alt doorway 33)
     8: 0,   // water → floor (no spikes/water in feel-slice)
     9: 0,
     10: 0,
@@ -59,6 +59,23 @@
 
   function punyRect(row, col) {
     return { sx: col * FW, sy: row * FH, sw: FW, sh: FH };
+  }
+
+  // Puny frames are 32×32 with lots of empty pad — never scale full frame to 16×16 (noise).
+  // Content bbox ~ (9,8,14,15); foot-align bottom to (x,y).
+  const PUNY_OX = 9, PUNY_OY = 8, PUNY_CW = 14, PUNY_CH = 15;
+
+  function blitPuny(ctx, img, sx, sy, x, y, outW, outH) {
+    const dw = outW == null ? PUNY_CW : outW;
+    const dh = outH == null ? PUNY_CH : outH;
+    noSmooth(ctx);
+    ctx.drawImage(
+      img,
+      sx + PUNY_OX, sy + PUNY_OY, PUNY_CW, PUNY_CH,
+      Math.round(x - dw / 2), Math.round(y - dh),
+      dw, dh
+    );
+    return { dw, dh, dx: Math.round(x - dw / 2), dy: Math.round(y - dh) };
   }
 
   function loadImage(src) {
@@ -119,10 +136,9 @@
       }
     } else {
       const kid = DUN_MAP[id] != null ? DUN_MAP[id] : 0;
-      if (id === 5) {
-        // walls: vary by seed for edge interest
-        const variants = [1, 2, 3, 4, 5, 6];
-        blitTile(ctx, imgs.dungeon, variants[(seed || 0) % variants.length], x, y);
+      if (id === 5 || id === 4) {
+        // solid wall tile 14 (optional alts 28/40 — no random 1–6 corner scraps)
+        blitTile(ctx, imgs.dungeon, 14, x, y);
       } else if (id === 11) {
         blitTile(ctx, imgs.dungeon, 0, x, y);
         ctx.fillStyle = "rgba(107,123,132,0.35)";
@@ -166,12 +182,11 @@
     }
     // Prefer idle when walkFrame is specially -1? game passes 0/1 — use moving flag via swing
     const r = punyRect(row, col);
-    // foot-align: draw 16×16 centered on (x,y) using center crop of 32×32
-    ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, Math.round(x - 8), Math.round(y - 12), 16, 16);
+    const b = blitPuny(ctx, img, r.sx, r.sy, x, y);
     if (hurt) {
       ctx.globalAlpha = 0.35;
       ctx.fillStyle = "#fff";
-      ctx.fillRect(Math.round(x - 8), Math.round(y - 12), 16, 16);
+      ctx.fillRect(b.dx, b.dy, b.dw, b.dh);
       ctx.globalAlpha = 1;
     }
   }
@@ -187,11 +202,11 @@
     else if (moving) col = 3 + (frame % 3);
     else col = frame % 3;
     const r = punyRect(row, col);
-    ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, Math.round(x - 8), Math.round(y - 12), 16, 16);
+    const b = blitPuny(ctx, img, r.sx, r.sy, x, y);
     if (hurt) {
       ctx.globalAlpha = 0.3;
       ctx.fillStyle = "#fff";
-      ctx.fillRect(Math.round(x - 8), Math.round(y - 12), 16, 16);
+      ctx.fillRect(b.dx, b.dy, b.dw, b.dh);
       ctx.globalAlpha = 1;
     }
   }
@@ -208,13 +223,14 @@
     }
     const frame = dead ? 4 : ((performance.now() / 120) | 0) % 4;
     const sx = frame * 32;
-    const dw = dead ? 16 : 14;
-    const dh = dead ? 8 : 12;
-    ctx.drawImage(img, sx, 0, 32, 32, Math.round(x - dw / 2), Math.round(y - dh / 2 - 2), dw, dh);
+    // sample Puny content bbox; squash dead vertically a bit with foot align
+    const outW = dead ? 14 : 14;
+    const outH = dead ? 8 : 15;
+    const b = blitPuny(ctx, img, sx, 0, x, y, outW, outH);
     if (flash) {
       ctx.globalAlpha = 0.4;
       ctx.fillStyle = "#fff";
-      ctx.fillRect(Math.round(x - dw / 2), Math.round(y - dh / 2 - 2), dw, dh);
+      ctx.fillRect(b.dx, b.dy, b.dw, b.dh);
       ctx.globalAlpha = 1;
     }
   }
@@ -283,7 +299,7 @@
       blitTile(ctx, imgs.dungeon, kid, Math.round(x - 8), Math.round(y - 8));
     } else if (imgs.warrior) {
       const r = punyRect(0, 0);
-      ctx.drawImage(imgs.warrior, r.sx, r.sy, r.sw, r.sh, Math.round(x - 8), Math.round(y - 12), 16, 16);
+      blitPuny(ctx, imgs.warrior, r.sx, r.sy, x, y);
     }
     if (flash) {
       const a = 0.4 + 0.4 * Math.sin(performance.now() * 0.008);

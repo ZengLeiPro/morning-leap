@@ -1083,6 +1083,18 @@
   stick.addEventListener("touchend", endStick);
   stick.addEventListener("touchcancel", endStick);
 
+  function clearMoveInput() {
+    for (const k of Object.keys(keys)) delete keys[k];
+    touchAxis.x = touchAxis.y = 0;
+    touchSword = false;
+    stickTouchId = null;
+    if (knob) knob.style.transform = "translate(0,0)";
+  }
+  window.addEventListener("blur", clearMoveInput);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") clearMoveInput();
+  });
+
   function moveStick(t) {
     const r = stick.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
