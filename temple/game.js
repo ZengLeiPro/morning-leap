@@ -93,10 +93,14 @@
   }
 
   // ─── Integer nearest scale (stage box; overlays match, no CSS transform) ─
+  // Portrait: fill width (letterbox top/bottom). Landscape: fill height (letterbox sides).
   function fitCanvas() {
-    const sx = Math.floor(window.innerWidth / W);
-    const sy = Math.floor(window.innerHeight / H);
-    const scale = Math.max(1, Math.min(sx, sy));
+    const cssW = window.innerWidth;
+    const cssH = window.innerHeight;
+    const portrait = cssH >= cssW;
+    const scale = portrait
+      ? Math.max(1, Math.floor(cssW / W))
+      : Math.max(1, Math.floor(cssH / H));
     const pw = W * scale, ph = H * scale;
     stage.style.width = pw + "px";
     stage.style.height = ph + "px";
@@ -106,6 +110,7 @@
     canvas.style.imageRendering = "pixelated";
   }
   window.addEventListener("resize", fitCanvas);
+  window.addEventListener("orientationchange", () => setTimeout(fitCanvas, 50));
   fitCanvas();
 
   function syncMuteUI() {
