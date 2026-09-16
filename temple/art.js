@@ -5,7 +5,8 @@
 (function (global) {
   "use strict";
 
-  const COLS = 12, TW = 16, GAP = 1, STRIDE = TW + GAP;
+  // tilemap_packed.png is tightly packed (192×176 = 12×11 @ 16px) — NO 1px gap
+  const COLS = 12, TW = 16, GAP = 0, STRIDE = TW + GAP; // 16
   const FW = 32, FH = 32, FCOLS = 24;
   const DEBUG_WIRE = false;
 

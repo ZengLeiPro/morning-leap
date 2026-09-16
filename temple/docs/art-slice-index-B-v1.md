@@ -22,15 +22,16 @@
 - 文件：
   - 村：`game/town/tilemap_packed.png`（192×176）
   - 殿：`game/dungeon/tilemap_packed.png`（192×176）
-- 格：16×16，间距 1px，**12 列 × 11 行**，id `0…131`
+- 格：16×16，**无间距（packed）**，**12 列 × 11 行**，id `0…131`（192×176）
 - 源矩形：
 ```js
-const COLS = 12, TW = 16, GAP = 1, STRIDE = TW + GAP; // 17
+const COLS = 12, TW = 16, GAP = 0, STRIDE = TW + GAP; // 16 — packed atlases only
 function tileRect(id) {
   const c = id % COLS, r = (id / COLS) | 0;
   return { sx: c * STRIDE, sy: r * STRIDE, sw: TW, sh: TW };
 }
 ```
+> 若改用带 1px 缝的 `tilemap.png`，则用 `GAP = 1, STRIDE = 17`。成品手感片一律 `tilemap_packed.png` + `STRIDE = 16`。
 也可直接用原包 `Tiles/tile_XXXX.png`（已解压在 `assets-b/kenney-*/Tiles/`）。
 
 ### 1.2 Puny 角色表

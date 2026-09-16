@@ -58,9 +58,10 @@ html, body {
   flex-direction: column;
   align-items: center;
   pointer-events: none;
+  padding: calc(var(--ui-scale, 1) * 10px) calc(var(--ui-scale, 1) * 8px) calc(var(--ui-scale, 1) * 8px);
 }
 .ui-title-name {
-  margin-top: calc(var(--ui-scale, 1) * 22px);
+  margin-top: calc(var(--ui-scale, 1) * 8px);
   color: #2A1F1A;
   font-size: calc(var(--ui-scale, 1) * 18px);
   font-weight: 800;
@@ -74,12 +75,13 @@ html, body {
   font-weight: 600;
 }
 .ui-title-btns {
-  margin-top: calc(var(--ui-scale, 1) * 52px);
+  margin-top: calc(var(--ui-scale, 1) * 14px);
   display: flex;
   flex-direction: column;
   gap: calc(var(--ui-scale, 1) * 6px);
   align-items: center;
   pointer-events: auto;
+  flex-shrink: 0;
 }
 .ui-btn {
   width: calc(var(--ui-scale, 1) * 100px);
@@ -96,17 +98,28 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 .ui-btn:active { background: #E76F51; }
+.ui-title-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--ui-scale, 1) * 5px);
+  padding-top: calc(var(--ui-scale, 1) * 10px);
+  flex-shrink: 0;
+}
 .ui-title-hint {
-  position: absolute;
-  bottom: calc(var(--ui-scale, 1) * 22px);
+  position: static;
   color: rgba(42, 31, 26, 0.75);
   font-size: calc(var(--ui-scale, 1) * 7px);
+  text-align: center;
+  line-height: 1.35;
 }
 .ui-title-credit {
-  position: absolute;
-  bottom: calc(var(--ui-scale, 1) * 8px);
-  color: rgba(42, 31, 26, 0.75);
-  font-size: calc(var(--ui-scale, 1) * 7px);
+  position: static;
+  color: rgba(42, 31, 26, 0.65);
+  font-size: calc(var(--ui-scale, 1) * 6px);
+  text-align: center;
+  line-height: 1.35;
 }
 
 .ui-hud { pointer-events: none; }

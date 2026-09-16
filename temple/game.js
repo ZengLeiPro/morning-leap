@@ -40,6 +40,7 @@
 
   let mode = MODE.TITLE;
   let fade = 0, fadeDir = 0, fadeCb = null;
+  let deathTimer = 0;
   let hitstop = 0;
   let doorCool = 0;
   let time = 0;
@@ -191,9 +192,12 @@
   }
 
   function applySave(data) {
+    clearFadeAndDead();
     player = defaultPlayer();
     player.maxHp = data.maxHp || 3;
-    player.hp = data.hp != null ? data.hp : player.maxHp;
+    let hp = data.hp != null ? data.hp : player.maxHp;
+    if (!(hp > 0)) hp = player.maxHp; // never resume into a dead state
+    player.hp = Math.min(player.maxHp, hp);
     player.gold = data.gold || 0;
     player.keys = data.keys || 0;
     player.bossKeys = data.bossKeys || 0;
@@ -208,9 +212,11 @@
     bestEnding = !!data.bestEnding;
     const rid = Maps.ROOMS[data.roomId] ? data.roomId : "village";
     enterRoom(rid, data.px, data.py, true);
+    player.spawnProt = 3000; // avoid false death on continue / village entry
   }
 
   function newGame() {
+    clearFadeAndDead();
     try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
     player = defaultPlayer();
     flags = { cleared: {} };
@@ -226,6 +232,14 @@
   }
 
   function hasSave() { return !!loadRaw(); }
+
+
+  function clearFadeAndDead() {
+    fade = 0;
+    fadeDir = 0;
+    fadeCb = null;
+    if (deathTimer) { clearTimeout(deathTimer); deathTimer = 0; }
+  }
 
   // ─── Room ───────────────────────────────────────────────────────────────
   function enterRoom(id, px, py, skipFade) {
@@ -443,20 +457,23 @@
     if (player.hp <= 0) {
       mode = MODE.DEAD;
       toast = null;
-      setTimeout(() => respawnVillage(), 900);
+      dialog = null;
+      if (deathTimer) clearTimeout(deathTimer);
+      deathTimer = setTimeout(() => { deathTimer = 0; respawnVillage(); }, 700);
     }
   }
 
   function respawnVillage() {
+    clearFadeAndDead();
     player.hp = player.maxHp;
     player.iframe = 0;
     player.knock.x = player.knock.y = 0;
-    showDialog("旁白", ["眼前一黑……再试一次。"], () => {
-      enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
-      player.spawnProt = 3000;
-      mode = MODE.PLAY;
-      save();
-    });
+    // Auto-respawn — no E-to-dismiss death dialog (avoids stuck dead UI)
+    enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
+    player.spawnProt = 3000;
+    mode = MODE.PLAY;
+    showToast("眼前一黑……再试一次。");
+    save();
   }
 
   // ─── Dialog ─────────────────────────────────────────────────────────────
@@ -606,6 +623,7 @@
           flags.bossDoorOpen = true;
         }
         enterRoom(dest, sx, sy);
+        player.spawnProt = Math.max(player.spawnProt || 0, 1200);
         // Stay in FADE until fade-out completes; FADE branch sets PLAY at fade<=0
         updateDoorVisuals();
         save();
@@ -1022,6 +1040,7 @@
   });
 
   function clickTitle(i) {
+    clearFadeAndDead();
     if (i === 0) newGame();
     else {
       const data = loadRaw();

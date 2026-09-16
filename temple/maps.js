@@ -32,15 +32,18 @@
   }
 
 
-  /** ≥1 tile visual margin below border so bottom decoration isn't flush-cut by the viewport */
-  function appendBottomPad(room, fillId, wallId) {
-    const w = room.w, h = room.h;
+  /** ≥2 tile visual margin below border so south decoration stays visible at spawn (cam max includes pad) */
+  function appendBottomPad(room, fillId, wallId, rows) {
+    const n = rows == null ? 2 : rows;
+    const w = room.w;
     const tiles = room.tiles.slice();
-    for (let x = 0; x < w; x++) {
-      const id = (x === 0 || x === w - 1) ? wallId : fillId;
-      tiles.push(id);
+    for (let r = 0; r < n; r++) {
+      for (let x = 0; x < w; x++) {
+        const id = (x === 0 || x === w - 1) ? wallId : fillId;
+        tiles.push(id);
+      }
     }
-    room.h = h + 1;
+    room.h = room.h + n;
     room.tiles = tiles;
   }
 
