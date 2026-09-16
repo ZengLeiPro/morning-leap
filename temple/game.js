@@ -9,7 +9,7 @@
   const T = Maps.T;
   const W = 320, H = 180;
   const SAVE_KEY = "morning-temple-save";
-  const SPEED = 65;
+  const SPEED = 58;
   const ATK_MS = 180;
   const ATK_ACTIVE_START = 40;
   const ATK_ACTIVE_END = 120;
@@ -212,7 +212,7 @@
     bestEnding = !!data.bestEnding;
     const rid = Maps.ROOMS[data.roomId] ? data.roomId : "village";
     enterRoom(rid, data.px, data.py, true);
-    player.spawnProt = 3000; // avoid false death on continue / village entry
+    player.spawnProt = 4000; // longer on village — easier to find elder, avoid false death
   }
 
   function newGame() {
@@ -226,7 +226,7 @@
     questOn = false;
     bestEnding = false;
     enterRoom("village", null, null, true);
-    player.spawnProt = 3000;
+    player.spawnProt = 4000;
     mode = MODE.PLAY;
     save();
   }
@@ -470,7 +470,7 @@
     player.knock.x = player.knock.y = 0;
     // Auto-respawn — no E-to-dismiss death dialog (avoids stuck dead UI)
     enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
-    player.spawnProt = 3000;
+    player.spawnProt = 4000;
     mode = MODE.PLAY;
     showToast("眼前一黑……再试一次。");
     save();
@@ -623,7 +623,7 @@
           flags.bossDoorOpen = true;
         }
         enterRoom(dest, sx, sy);
-        player.spawnProt = Math.max(player.spawnProt || 0, 1200);
+        player.spawnProt = Math.max(player.spawnProt || 0, dest === "village" ? 4000 : 1200);
         // Stay in FADE until fade-out completes; FADE branch sets PLAY at fade<=0
         updateDoorVisuals();
         save();
@@ -672,12 +672,12 @@
       if (Math.abs(player.knock.y) < 0.2) player.knock.y = 0;
     }
 
-    // hold-to-move continuous; diagonal normalize; release = stop (no sticky slide)
+    // hold-to-move via e.code (layout/IME-safe); release = immediate stop
     let mx = 0, my = 0;
-    if (keys.ArrowLeft || keys.a || keys.A) mx -= 1;
-    if (keys.ArrowRight || keys.d || keys.D) mx += 1;
-    if (keys.ArrowUp || keys.w || keys.W) my -= 1;
-    if (keys.ArrowDown || keys.s || keys.S) my += 1;
+    if (keys.ArrowLeft || keys.KeyA) mx -= 1;
+    if (keys.ArrowRight || keys.KeyD) mx += 1;
+    if (keys.ArrowUp || keys.KeyW) my -= 1;
+    if (keys.ArrowDown || keys.KeyS) my += 1;
     mx += touchAxis.x;
     my += touchAxis.y;
     moving = !!(mx || my);
@@ -698,8 +698,8 @@
       player.walkAcc = 0;
     }
 
-    // Attack: J/Z only (not Space, not dialog keys); never during dialog
-    if (mode === MODE.PLAY && (atkQueued || touchSword || keys.j || keys.J || keys.z || keys.Z) && hasSword && player.swingT < 0) {
+    // Attack: edge-queued KeyJ/KeyZ only (not Space, not hold-repeat from stuck keys)
+    if (mode === MODE.PLAY && (atkQueued || touchSword) && hasSword && player.swingT < 0) {
       player.swingT = 0;
       atkQueued = false;
       touchSword = false;
@@ -988,30 +988,52 @@
     // Title / buttons / hints → sharp HTML overlay
   }
 
-  // ─── Input — attack vs dialog separated ─────────────────────────────────
+  // ─── Input — e.code for movement (IME/layout-safe); attack edge-queue ────
+  const MOVE_CODES = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+  const CODE_KEY_ALIASES = {
+    KeyW: ["w", "W"], KeyA: ["a", "A"], KeyS: ["s", "S"], KeyD: ["d", "D"],
+    KeyJ: ["j", "J"], KeyZ: ["z", "Z"],
+    ArrowUp: ["ArrowUp"], ArrowDown: ["ArrowDown"], ArrowLeft: ["ArrowLeft"], ArrowRight: ["ArrowRight"],
+  };
+  function clearCodeAndAliases(code, key) {
+    if (code) delete keys[code];
+    if (key) {
+      delete keys[key];
+      delete keys[key.toLowerCase()];
+      delete keys[key.toUpperCase()];
+    }
+    const aliases = CODE_KEY_ALIASES[code];
+    if (aliases) for (const a of aliases) delete keys[a];
+  }
+
   window.addEventListener("keydown", (e) => {
-    keys[e.key] = true;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+    // Movement state keyed by physical code — never e.key (IME mismatch sticks)
+    if (MOVE_CODES.has(e.code)) {
+      keys[e.code] = true;
+      e.preventDefault();
+    }
+    if (e.code === "Space") e.preventDefault();
 
     // Dialog / confirm: E Enter Space Escape — never swing
-    if (e.key === "e" || e.key === "E" || e.key === "Enter" || e.key === "Escape") {
+    if (e.code === "KeyE" || e.code === "Enter" || e.code === "Escape") {
       if (mode === MODE.DIALOG) advanceDialog();
       else if (mode === MODE.PLAY) interact();
       return;
     }
-    if (e.key === " " || e.key === "Spacebar") {
-      e.preventDefault();
+    if (e.code === "Space") {
       if (mode === MODE.DIALOG) advanceDialog();
       else if (mode === MODE.TITLE) clickTitle(hasSave() ? 1 : 0);
       else if (mode === MODE.PLAY) interact(); // Space = confirm/talk, NOT attack
       return;
     }
-    // Attack only
-    if ((e.key === "j" || e.key === "J" || e.key === "z" || e.key === "Z") && mode === MODE.PLAY) {
+    // Attack: keydown edge only (ignore repeat / stuck hold)
+    if ((e.code === "KeyJ" || e.code === "KeyZ") && mode === MODE.PLAY && !e.repeat) {
       atkQueued = true;
     }
   });
-  window.addEventListener("keyup", (e) => { keys[e.key] = false; });
+  window.addEventListener("keyup", (e) => {
+    clearCodeAndAliases(e.code, e.key);
+  });
 
   canvas.addEventListener("click", () => {
     if (mode === MODE.TITLE || mode === MODE.END) return; // HTML buttons
@@ -1085,12 +1107,16 @@
 
   function clearMoveInput() {
     for (const k of Object.keys(keys)) delete keys[k];
-    touchAxis.x = touchAxis.y = 0;
+    touchAxis.x = 0;
+    touchAxis.y = 0;
     touchSword = false;
+    atkQueued = false;
     stickTouchId = null;
     if (knob) knob.style.transform = "translate(0,0)";
   }
+  // Clear on lose focus AND on regain focus (kills ghost walk after Alt-Tab)
   window.addEventListener("blur", clearMoveInput);
+  window.addEventListener("focus", clearMoveInput);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") clearMoveInput();
   });

@@ -162,6 +162,7 @@
   }
 
   function drawHero(ctx, x, y, dir, walkFrame, swingT, hurt, winPose) {
+    // Player ONLY — Warrior-Blue via blitPuny. Never dungeon atlas / tile 84.
     noSmooth(ctx);
     const img = imgs.warrior;
     if (!img) {
@@ -192,6 +193,7 @@
   }
 
   function drawHeroIdle(ctx, x, y, dir, frame, moving, swinging, hurt) {
+    // Player ONLY — Warrior-Blue via blitPuny bbox. Never dungeon tile 84 (purple mage).
     noSmooth(ctx);
     const img = imgs.warrior;
     if (!img) return;
@@ -293,19 +295,40 @@
 
   function drawNpc(ctx, x, y, kind, flash) {
     noSmooth(ctx);
-    // Art review: do not use Warrior-Blue for villagers — dungeon static 84/86/85 (111 ok for elder)
+    // Prefer dedicated Puny sheets (same bbox as hero) — NEVER Warrior-Blue, NEVER player from dungeon 84.
+    // Elder → npc-elder-candidate; merchant/villager → npc-mage (distinct from blue helmet warrior).
+    let img = null;
+    if (kind === "elder" && imgs.elder) img = imgs.elder;
+    else if ((kind === "merchant" || kind === "villager") && imgs.mage) img = imgs.mage;
+    else if (kind === "elder" && imgs.mage) img = imgs.mage;
+
+    if (img) {
+      const r = punyRect(0, (flash ? ((performance.now() / 200) | 0) % 3 : 0));
+      const b = blitPuny(ctx, img, r.sx, r.sy, x, y);
+      if (flash) {
+        const a = 0.55 + 0.45 * Math.sin(performance.now() * 0.01);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#F4A261";
+        ctx.fillRect(b.dx - 2, b.dy - 4, b.dw + 4, 3);
+        // soft halo so elder is easy to spot outdoors
+        ctx.globalAlpha = 0.25 + 0.2 * Math.sin(performance.now() * 0.01);
+        ctx.fillStyle = "#FFE8C8";
+        ctx.fillRect(b.dx - 1, b.dy - 1, b.dw + 2, b.dh + 2);
+        ctx.globalAlpha = 1;
+      }
+      return;
+    }
+
+    // Fallback only: dungeon static 84/86/85, foot-aligned + slight Y offset so not mistaken for player
     const kid = kind === "elder" ? 84 : kind === "merchant" ? 86 : 85;
     if (imgs.dungeon) {
-      blitTile(ctx, imgs.dungeon, kid, Math.round(x - 8), Math.round(y - 8));
-    } else if (imgs.warrior) {
-      const r = punyRect(0, 0);
-      blitPuny(ctx, imgs.warrior, r.sx, r.sy, x, y);
+      blitTile(ctx, imgs.dungeon, kid, Math.round(x - 8), Math.round(y - 16));
     }
     if (flash) {
-      const a = 0.4 + 0.4 * Math.sin(performance.now() * 0.008);
+      const a = 0.55 + 0.45 * Math.sin(performance.now() * 0.01);
       ctx.globalAlpha = a;
       ctx.fillStyle = "#F4A261";
-      ctx.fillRect(Math.round(x - 9), Math.round(y - 14), 18, 2);
+      ctx.fillRect(Math.round(x - 9), Math.round(y - 20), 18, 3);
       ctx.globalAlpha = 1;
     }
   }
