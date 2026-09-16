@@ -451,20 +451,38 @@
   function drawHUD(ctx, hp, maxHp) {
     noSmooth(ctx);
     for (let i = 0; i < maxHp; i++) {
-      const filled = i < Math.ceil(hp);
+      const full = hp >= i + 1;
+      const half = !full && hp >= i + 0.5;
       const hx = 6 + i * 12;
       const hy = 4;
       if (imgs.dungeon) {
-        ctx.globalAlpha = filled ? 1 : 0.35;
+        // empty/dim base
+        ctx.globalAlpha = 0.35;
         blitTile(ctx, imgs.dungeon, 115, hx - 4, hy - 2);
         ctx.globalAlpha = 1;
-        if (!filled) {
+        if (full) {
+          blitTile(ctx, imgs.dungeon, 115, hx - 4, hy - 2);
+        } else if (half) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(hx - 4, hy - 2, 8, 16);
+          ctx.clip();
+          blitTile(ctx, imgs.dungeon, 115, hx - 4, hy - 2);
+          ctx.restore();
+        } else {
           ctx.fillStyle = "rgba(42,31,26,0.5)";
           ctx.fillRect(hx - 2, hy, 10, 10);
         }
       } else {
-        ctx.fillStyle = filled ? "#E76F51" : "rgba(42,31,26,0.4)";
+        ctx.fillStyle = "rgba(42,31,26,0.4)";
         ctx.fillRect(hx, hy, 9, 8);
+        if (full) {
+          ctx.fillStyle = "#E76F51";
+          ctx.fillRect(hx, hy, 9, 8);
+        } else if (half) {
+          ctx.fillStyle = "#E76F51";
+          ctx.fillRect(hx, hy, 5, 8);
+        }
       }
     }
   }

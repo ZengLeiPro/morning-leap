@@ -336,7 +336,7 @@
     const spawnInvuln = 3000;
     if (e.type === "slime") {
       return {
-        type: "slime", hp: 1, maxHp: 1, dmg: 1, speed: e.slow ? 18 : 40,
+        type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: e.slow ? 18 : 40,
         x: e.x, y: e.y, flash: 0, squash: 0, stun: 0, dead: false,
         knock: { x: 0, y: 0 }, spawnInvuln,
       };
@@ -362,8 +362,7 @@
   }
 
   function doorLooksOpen(d) {
-    // Visual: switch alone opens T1 north look; boss key still required to enter
-    if (d.needSwitchT2 && d.needBossKey) return !!flags.switchT2;
+    // Visual must match enterability (P0): no fake unlock after switchT2 alone
     return isDoorOpen(d);
   }
 
@@ -829,6 +828,7 @@
           player.bossKeys = Math.min(9, player.bossKeys + 1);
           flags.gotBossKeyPickup = true;
           showToast("获得Boss钥匙 ×1");
+          updateDoorVisuals();
         } else {
           player.keys = Math.min(9, player.keys + 1);
           showToast("获得钥匙 ×1");
@@ -915,7 +915,7 @@
       if (e.summonWarn <= 0) {
         e.summonWarn = 0;
         enemies.push({
-          type: "slime", hp: 1, maxHp: 1, dmg: 1, speed: 40,
+          type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: 40,
           x: e.summonX, y: e.summonY, flash: 0, squash: 0, stun: 0, dead: false,
           knock: { x: 0, y: 0 }, spawnInvuln: 500,
         });
