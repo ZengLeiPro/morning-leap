@@ -89,7 +89,8 @@ function punyRect(row, col) {
 | V_CHEST_O | 心箱开 | 131 | |
 | V_COIN | 地上金 | 93 | 固定×5 |
 | V_KEY_ICON | 钥（UI/掉落） | 116 | |
-| V_GATE | 神殿门外观 | 城堡门段 108–114 | 村→殿入口 |
+| V_WATER | 水塘 | — | 手感片**移除**；Tiny Town 无水瓦，禁止矢量填色 |
+| V_GATE | 神殿门外观 | **Dungeon 9 锁 / 10 开**（或 Town 城堡门 111–114） | 村→殿入口；**禁止** Town 108/109（石墙） |
 
 ### 2.2 殿（Tiny Dungeon atlas）
 
@@ -104,10 +105,11 @@ function punyRect(row, col) {
 | D_CHEST_C/O | 宝箱 | 89 一带 / 开态 | Boss 钥箱 |
 | D_HEART | 心拾取 | 药水红瓶 ~113–116 或 Town 心用 UI | 优先红心感 |
 | D_STAIRS | 阶 | 54–55 | 可选 |
-| D_NPC_ELDER | 静态 NPC 备 | 84 | 紫帽长老感 |
-| D_NPC_MERCH | 商人备 | 86 | |
+| D_NPC_ELDER | 静态 NPC 备 | **84**（或 111） | 紫帽长老；**禁止** Warrior-Blue |
+| D_NPC_MERCH | 商人备 | **86** | |
+| D_NPC_VILLAGER | 村民备 | **85** | |
 | D_SLIME | 静帧敌 | 92 | 动效用 Puny Slime |
-| D_BOSS | Boss 静帧备 | 122/124 | 大怪；动可用放大+闪 |
+| D_BOSS | Boss 静帧备 | **109（独眼巨人）×2** | 122/124 为蛛/鼠；P2 红闪 OK |
 
 > 「约」= 以 `assets-b/town-numbered.png` / `dungeon-numbered.png` 黄字为准做最终钉死；上表已按抽样行核对开关 **7/8**。
 
@@ -122,7 +124,7 @@ function punyRect(row, col) {
 | `drawSwitch` | `D_SWITCH_OFF/ON`（id 7/8） |
 | `drawHeartPickup` | 殿道具红瓶或 Town 心形；逻辑仍 8×8 拾取盒 |
 | `drawSlime` | Puny `Slime.png` 帧循环 |
-| `drawBoss` | Dungeon 大怪静帧 + 缩放 2× + 红眼期整图偏红/闪白 |
+| `drawBoss` | Dungeon **109 独眼巨人** + 缩放 2× + P2 红闪 |
 | `drawDialog/HUD` | 可用 Kenney UI 色块或纯 Canvas 字；心槽用红心 tile |
 
 ---

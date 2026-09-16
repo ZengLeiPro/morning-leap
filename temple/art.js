@@ -17,15 +17,14 @@
     3: 0,   // (unused outdoors)
     4: 4,   // wall → tree solid look
     5: 5,   // alt tree
-    6: 108, // open gate-ish
-    7: 109, // locked gate
-    8: 93,  // water proxy / deco (coin tile unused for water — use dark)
+    // 6/7 village→temple gate: drawn from dungeon atlas door 10/9 (not town 108/109 stone)
+    6: 10,  // open door (dungeon kid; see drawTile outdoor special-case)
+    7: 9,   // locked door (dungeon kid)
+    8: 0,   // water removed from feel-slice — grass if any leftover
     9: 2,   // flower
     10: 1,  // deco grass
     11: 0,
   };
-  // better water: town may have water around higher ids — use bush/dark path look
-  TOWN_MAP[8] = 6; // bush as "water edge" placeholder; solid collision still holds
 
   const DUN_MAP = {
     0: 0,
@@ -105,15 +104,16 @@
   function drawTile(ctx, id, x, y, seed, outdoor) {
     noSmooth(ctx);
     if (outdoor) {
-      const kid = TOWN_MAP[id] != null ? TOWN_MAP[id] : 0;
-      if (id === 1 && ((seed || 0) % 7 === 0)) {
+      // Village→temple entrance: dungeon door 9 locked / 10 open (art review SHA 056f6fc)
+      if (id === 6 || id === 7) {
+        blitTile(ctx, imgs.dungeon, id === 6 ? 10 : 9, x, y);
+      } else if (id === 1 && ((seed || 0) % 7 === 0)) {
         blitTile(ctx, imgs.town, 1, x, y); // grass deco
       } else if (id === 8) {
-        // water: dark fill + bush overlay for scheme B minimal
-        ctx.fillStyle = "#5B8FA8";
-        ctx.fillRect(x, y, TW, TW);
-        blitTile(ctx, imgs.town, 6, x, y);
+        // Water removed — no Tiny Town water tile; draw grass (pond excised from map)
+        blitTile(ctx, imgs.town, 0, x, y);
       } else {
+        const kid = TOWN_MAP[id] != null ? TOWN_MAP[id] : 0;
         blitTile(ctx, imgs.town, kid, x, y);
       }
     } else {
@@ -220,7 +220,7 @@
 
   function drawStone(ctx, x, y, flash) {
     noSmooth(ctx);
-    // dungeon static enemy tile ~92 or wall-ish 122
+    // dungeon static enemy tile ~92 (slime-ish)
     if (imgs.dungeon) {
       blitTile(ctx, imgs.dungeon, 92, Math.round(x - 8), Math.round(y - 8));
     } else {
@@ -240,7 +240,7 @@
     const scale = 2;
     const dw = 16 * scale, dh = 16 * scale;
     if (imgs.dungeon) {
-      const kid = dead ? 124 : 122;
+      const kid = 109; // cyclops ×2 (122/124 are spider/rat)
       const r = tileRect(kid);
       ctx.drawImage(imgs.dungeon, r.sx, r.sy, r.sw, r.sh, Math.round(x - dw / 2), Math.round(y - dh / 2), dw, dh);
     } else {
@@ -276,22 +276,13 @@
 
   function drawNpc(ctx, x, y, kind, flash) {
     noSmooth(ctx);
-    let img = null;
-    if (kind === "elder") img = imgs.elder;
-    else if (kind === "merchant") img = imgs.mage;
-    else img = imgs.warrior; // villager: blue warrior idle
-    if (img) {
-      // NPCs: use frame 0 row S, or full sheet for elder/mage candidates
-      if (kind === "elder" || kind === "merchant") {
-        // candidate sheets may be single portrait or puny-like — draw centered 16×16 from top-left frame
-        const sw = Math.min(32, img.width), sh = Math.min(32, img.height);
-        ctx.drawImage(img, 0, 0, sw, sh, Math.round(x - 8), Math.round(y - 12), 16, 16);
-      } else {
-        const r = punyRect(0, 0);
-        ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, Math.round(x - 8), Math.round(y - 12), 16, 16);
-      }
-    } else if (imgs.dungeon) {
-      blitTile(ctx, imgs.dungeon, kind === "elder" ? 84 : 86, Math.round(x - 8), Math.round(y - 8));
+    // Art review: do not use Warrior-Blue for villagers — dungeon static 84/86/85 (111 ok for elder)
+    const kid = kind === "elder" ? 84 : kind === "merchant" ? 86 : 85;
+    if (imgs.dungeon) {
+      blitTile(ctx, imgs.dungeon, kid, Math.round(x - 8), Math.round(y - 8));
+    } else if (imgs.warrior) {
+      const r = punyRect(0, 0);
+      ctx.drawImage(imgs.warrior, r.sx, r.sy, r.sw, r.sh, Math.round(x - 8), Math.round(y - 12), 16, 16);
     }
     if (flash) {
       const a = 0.4 + 0.4 * Math.sin(performance.now() * 0.008);

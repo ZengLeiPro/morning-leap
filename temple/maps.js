@@ -52,11 +52,10 @@
     tiles[4 * w + 5] = 9;
     tiles[10 * w + 16] = 9;
     tiles[3 * w + 15] = 9;
-    // north temple gate (locked visual)
+    // north temple gate (locked visual) — art draws dungeon door 9/10
     tiles[2 * w + 10] = 7;
     tiles[2 * w + 11] = 7;
-    // small pond west
-    setRect(tiles, w, 2, 3, 4, 5, 8);
+    // pond removed: Tiny Town has no water tile (art review — no vector fill)
     return {
       id: "village",
       name: "晨光村",
