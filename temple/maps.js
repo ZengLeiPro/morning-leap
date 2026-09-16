@@ -31,6 +31,23 @@
     }
   }
 
+  /** Interior id-5 not on the ring and not 4-connected to another wall/door → floor. Keeps borders/doors. */
+  function clearOrphanInteriorWalls(room) {
+    const w = room.w, h = room.h, tiles = room.tiles;
+    const wallish = { 5: 1, 6: 1, 7: 1 };
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (tiles[i] !== 5) continue;
+        let n = 0;
+        if (wallish[tiles[i - 1]]) n++;
+        if (wallish[tiles[i + 1]]) n++;
+        if (wallish[tiles[i - w]]) n++;
+        if (wallish[tiles[i + w]]) n++;
+        if (n === 0) tiles[i] = 3;
+      }
+    }
+  }
 
   /** ≥2 tile visual margin below border so south decoration stays visible at spawn (cam max includes pad) */
   function appendBottomPad(room, fillId, wallId, rows) {
@@ -252,6 +269,9 @@
   appendBottomPad(T1, 3, 5);
   appendBottomPad(T2, 3, 5);
   appendBottomPad(T3, 3, 5);
+  clearOrphanInteriorWalls(T1);
+  clearOrphanInteriorWalls(T2);
+  clearOrphanInteriorWalls(T3);
 
   const ROOMS = { village, T1, T2, T3 };
 
