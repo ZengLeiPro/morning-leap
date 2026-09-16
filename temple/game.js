@@ -412,7 +412,9 @@
 
   // ─── Collision ──────────────────────────────────────────────────────────
   function footBox(px, py) {
-    return { x: px - 5, y: py + 2, w: 10, h: 8 };
+    // Entity (px,py) = foot point (art lock B v1.3). Box straddles the feet — not below them
+    // (old py+2 made collision sit ~½–1 tile south of the sprite, so doors/NPC talks felt high).
+    return { x: px - 5, y: py - 4, w: 10, h: 8 };
   }
   function aabb(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -432,7 +434,7 @@
     for (const [px, py] of pts) if (solidAt(px, py)) { blocked = true; break; }
     if (!blocked && ent === player) {
       for (const n of room.npcs || []) {
-        if (aabb(box, { x: n.x - 6, y: n.y - 4, w: 12, h: 12 })) { blocked = true; break; }
+        if (aabb(box, { x: n.x - 6, y: n.y - 8, w: 12, h: 10 })) { blocked = true; break; }
       }
     }
     if (!blocked) { ent.x = nx; ent.y = ny; return true; }
@@ -447,7 +449,7 @@
     for (const [px, py] of pts) if (solidAt(px, py)) return false;
     if (ent === player) {
       for (const n of room.npcs || []) {
-        if (aabb(box, { x: n.x - 6, y: n.y - 4, w: 12, h: 12 })) return false;
+        if (aabb(box, { x: n.x - 6, y: n.y - 8, w: 12, h: 10 })) return false;
       }
     }
     ent.x = nx; ent.y = ny;
@@ -656,8 +658,10 @@
         else if (d.needSwitchT2 && !flags.switchT2) msg = "门还锁着。";
         else if (d.needBossKey && !(flags.bossDoorOpen || player.bossKeys >= 1)) msg = "需要钥匙。";
         if (!toast || toast.t < 200) showToast(msg);
+        // South wall row is contentH-1 (padRows sit below the border — do not use room.h-1)
+        const southRow = (room.contentH != null ? room.contentH : room.h) - 1;
         if (d.y === 0) player.y += 2;
-        else if (d.y >= room.h - 1) player.y -= 2;
+        else if (d.y >= southRow) player.y -= 2;
         else if (d.x === 0) player.x += 2;
         else player.x -= 2;
         return;
@@ -869,13 +873,20 @@
     if (enemies.length && roomCleared()) markRoomClearedIfDone();
     tryDoor();
 
-    // Maps append ≥1 bottom pad tile so south decoration isn't flush-cut
+    // Bottom pad is visual-only south of the border wall. Default cam max uses contentH
+    // (pre-pad) so spawn/plaza match pre-pad framing — appendBottomPad alone was shifting
+    // the whole scene up ~2 tiles by raising cam.y max. Reveal pad only near south wall.
     cam.x = Math.round(player.x - W / 2);
     cam.y = Math.round(player.y - H / 2);
-    cam.x = Math.max(0, Math.min(cam.x, room.w * T - W));
-    cam.y = Math.max(0, Math.min(cam.y, room.h * T - H));
+    cam.x = Math.max(0, Math.min(cam.x, Math.max(0, room.w * T - W)));
+    const contentH = (room.contentH != null ? room.contentH : room.h) * T;
+    const maxCamY = Math.max(0, room.h * T - H);
+    const contentMaxCamY = Math.max(0, contentH - H);
+    cam.y = Math.max(0, Math.min(cam.y, maxCamY));
+    const nearSouth = player.y >= contentH - T * 3;
+    if (!nearSouth) cam.y = Math.min(cam.y, contentMaxCamY);
     if (room.w * T < W) cam.x = Math.round((room.w * T - W) / 2);
-    if (room.h * T < H) cam.y = Math.round((room.h * T - H) / 2);
+    if (contentH < H) cam.y = Math.round((contentH - H) / 2);
   }
 
   function enemyBox(e) {

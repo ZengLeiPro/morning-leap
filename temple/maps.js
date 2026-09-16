@@ -49,19 +49,26 @@
     }
   }
 
-  /** ≥2 tile visual margin below border so south decoration stays visible at spawn (cam max includes pad) */
+  /**
+   * Visual-only margin SOUTH of the existing border wall (not playable interior).
+   * Pad lets cam max show the south wall without flush-cut; room.padRows records it so
+   * camera soft-clamp / south-door edge checks ignore pad and do not shift content up.
+   */
   function appendBottomPad(room, fillId, wallId, rows) {
     const n = rows == null ? 2 : rows;
     const w = room.w;
     const tiles = room.tiles.slice();
     for (let r = 0; r < n; r++) {
       for (let x = 0; x < w; x++) {
+        // Match border look on sides; fill is scenery only (unreachable past solid south wall)
         const id = (x === 0 || x === w - 1) ? wallId : fillId;
         tiles.push(id);
       }
     }
     room.h = room.h + n;
     room.tiles = tiles;
+    room.padRows = n;
+    room.contentH = room.h - n; // height to south wall inclusive (pre-pad)
   }
 
   function punchDoor(tiles, w, d) {
@@ -121,9 +128,9 @@
         { id: "vg4", x: 12 * T + 8, y: 12 * T + 8 },
         { id: "vg5", x: 13 * T + 8, y: 12 * T + 8 },
       ],
-      // Reviewer: 0 or at most 1 village slime — SE corner, off spawn/elder plaza path
+      // Reviewer: 0 or at most 1 village slime — SE, north of south wall (row 13), off plaza
       enemies: [
-        { type: "slime", x: 19 * T + 8, y: 13 * T + 8, slow: true },
+        { type: "slime", x: 19 * T + 8, y: 12 * T + 8, slow: true },
       ],
       signs: [],
       props: [

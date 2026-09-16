@@ -164,3 +164,20 @@ function punyRect(row, col) {
 | 神殿门 | 拱门 **9/10** 或门口 **22/33** | — |
 | Puny 绘制 | 内容 bbox ~(9,8,14,15) 再画到逻辑尺寸 | 整帧 32×32 压到 16×16 |
 | 失焦粘键 | `blur` / `visibilitychange(hidden)` 清 key+touch | — |
+
+
+---
+
+## 紧急勘误 v1.3（2026-09-16）— NPC 同模 / 脚锚点
+
+### P0：长老 ≠ 玩家（禁止同模）
+
+| 角色 | 必须用 | 禁止 |
+|------|--------|------|
+| **玩家** | `Warrior-Blue` + `blitPuny` bbox `(9,8,14,15)` 脚对齐 | NPC 表、Dungeon 84 |
+| **长老** | Dungeon atlas **id=84** 紫帽静帧 + flash halo | `Warrior-Blue`、`Soldier-*`、`npc-elder-candidate` |
+| **商人** | `npc-mage.png` bbox；备选 Dungeon **86** | 与长老同一张图 |
+
+### 落点偏上
+
+实体坐标 = 脚点。`appendBottomPad` 只在南墙**以南**加视觉边距（`padRows`/`contentH`）；相机默认按 `contentH` clamp，避免整幅上移 2–3 格。`footBox` 跨在脚点上，勿再 `py+2` 偏到脚下方。

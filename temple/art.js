@@ -47,7 +47,6 @@
     dungeon: null,
     warrior: null,
     slime: null,
-    elder: null,
     mage: null,
     ready: false,
   };
@@ -89,19 +88,19 @@
 
   function loadAll() {
     const base = "assets/";
+    // Art lock B v1.3: do NOT load npc-elder-candidate (Puny Soldier — same silhouette as Warrior-Blue).
+    // Elder = dungeon atlas 84 only; merchant = npc-mage (or dungeon 86 fallback).
     return Promise.all([
       loadImage(base + "town/tilemap_packed.png"),
       loadImage(base + "dungeon/tilemap_packed.png"),
       loadImage(base + "characters/Warrior-Blue.png"),
       loadImage(base + "characters/Slime.png"),
-      loadImage(base + "characters/npc-elder-candidate.png"),
       loadImage(base + "characters/npc-mage.png"),
-    ]).then(([town, dungeon, warrior, slime, elder, mage]) => {
+    ]).then(([town, dungeon, warrior, slime, mage]) => {
       imgs.town = town;
       imgs.dungeon = dungeon;
       imgs.warrior = warrior;
       imgs.slime = slime;
-      imgs.elder = elder;
       imgs.mage = mage;
       imgs.ready = true;
       return imgs;
@@ -295,41 +294,50 @@
 
   function drawNpc(ctx, x, y, kind, flash) {
     noSmooth(ctx);
-    // Prefer dedicated Puny sheets (same bbox as hero) — NEVER Warrior-Blue, NEVER player from dungeon 84.
-    // Elder → npc-elder-candidate; merchant/villager → npc-mage (distinct from blue helmet warrior).
-    let img = null;
-    if (kind === "elder" && imgs.elder) img = imgs.elder;
-    else if ((kind === "merchant" || kind === "villager") && imgs.mage) img = imgs.mage;
-    else if (kind === "elder" && imgs.mage) img = imgs.mage;
+    // Art lock B v1.3:
+    //   Elder    → dungeon 84 purple-hat static ONLY (never Soldier/Warrior/elder-candidate)
+    //   Merchant → npc-mage Puny bbox, else dungeon 86
+    //   Villager → dungeon 85
+    // Entity (x,y) = foot point → dungeon blit at (x-8, y-16); Puny via blitPuny foot-align.
 
-    if (img) {
-      const r = punyRect(0, (flash ? ((performance.now() / 200) | 0) % 3 : 0));
-      const b = blitPuny(ctx, img, r.sx, r.sy, x, y);
+    if (kind === "elder") {
+      const dx = Math.round(x - 8), dy = Math.round(y - 16);
+      if (imgs.dungeon) blitTile(ctx, imgs.dungeon, 84, dx, dy);
       if (flash) {
         const a = 0.55 + 0.45 * Math.sin(performance.now() * 0.01);
         ctx.globalAlpha = a;
         ctx.fillStyle = "#F4A261";
-        ctx.fillRect(b.dx - 2, b.dy - 4, b.dw + 4, 3);
-        // soft halo so elder is easy to spot outdoors
+        ctx.fillRect(dx - 1, dy - 4, 18, 3);
         ctx.globalAlpha = 0.25 + 0.2 * Math.sin(performance.now() * 0.01);
         ctx.fillStyle = "#FFE8C8";
-        ctx.fillRect(b.dx - 1, b.dy - 1, b.dw + 2, b.dh + 2);
+        ctx.fillRect(dx - 1, dy - 1, 18, 18);
         ctx.globalAlpha = 1;
       }
       return;
     }
 
-    // Fallback only: dungeon static 84/86/85, foot-aligned + slight Y offset so not mistaken for player
-    const kid = kind === "elder" ? 84 : kind === "merchant" ? 86 : 85;
-    if (imgs.dungeon) {
-      blitTile(ctx, imgs.dungeon, kid, Math.round(x - 8), Math.round(y - 16));
+    if (kind === "merchant" || kind === "villager") {
+      if (kind === "merchant" && imgs.mage) {
+        const r = punyRect(0, 0);
+        const b = blitPuny(ctx, imgs.mage, r.sx, r.sy, x, y);
+        if (flash) {
+          ctx.globalAlpha = 0.35;
+          ctx.fillStyle = "#FFE8C8";
+          ctx.fillRect(b.dx - 1, b.dy - 1, b.dw + 2, b.dh + 2);
+          ctx.globalAlpha = 1;
+        }
+        return;
+      }
+      const kid = kind === "merchant" ? 86 : 85;
+      if (imgs.dungeon) {
+        blitTile(ctx, imgs.dungeon, kid, Math.round(x - 8), Math.round(y - 16));
+      }
+      return;
     }
-    if (flash) {
-      const a = 0.55 + 0.45 * Math.sin(performance.now() * 0.01);
-      ctx.globalAlpha = a;
-      ctx.fillStyle = "#F4A261";
-      ctx.fillRect(Math.round(x - 9), Math.round(y - 20), 18, 3);
-      ctx.globalAlpha = 1;
+
+    // unknown kind — dungeon villager fallback, foot-aligned
+    if (imgs.dungeon) {
+      blitTile(ctx, imgs.dungeon, 85, Math.round(x - 8), Math.round(y - 16));
     }
   }
 
@@ -343,6 +351,7 @@
   }
 
   function drawChest(ctx, x, y, open, outdoor) {
+    // Pickup/prop coords are tile centers — center-anchor 16×16 into the tile (not character foot-align).
     noSmooth(ctx);
     if (outdoor && imgs.town) {
       blitTile(ctx, imgs.town, open ? 131 : 130, Math.round(x - 8), Math.round(y - 8));
