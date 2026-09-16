@@ -10,11 +10,11 @@
   const W = 320, H = 180;
   const SAVE_KEY = "morning-temple-save";
   const SPEED = 65;
-  const ATK_MS = 200;
-  const ATK_ACTIVE_START = 60;
-  const ATK_ACTIVE_END = 160;
+  const ATK_MS = 180;
+  const ATK_ACTIVE_START = 40;
+  const ATK_ACTIVE_END = 120;
   const IFRAME = 700;
-  const HITSTOP_MS = 45;
+  const HITSTOP_MS = 55;
   const STICK_DEAD = 0.28;
 
   const canvas = document.getElementById("game");
@@ -668,7 +668,8 @@
       mx /= len; my /= len;
       if (Math.abs(mx) > Math.abs(my)) player.dir = mx < 0 ? 2 : 3;
       else player.dir = my < 0 ? 1 : 0;
-      const step = SPEED * (dt / 1000);
+      let step = SPEED * (dt / 1000);
+      if (player.swingT >= 0) step *= 0.55;
       tryMove(player, mx * step, my * step);
       player.walkAcc += dt;
       if (player.walkAcc > 100) {
