@@ -121,9 +121,9 @@
         { id: "vg4", x: 12 * T + 8, y: 12 * T + 8 },
         { id: "vg5", x: 13 * T + 8, y: 12 * T + 8 },
       ],
-      // Reviewer: 0 or at most 1 village slime
+      // Reviewer: 0 or at most 1 village slime — SE corner, off spawn/elder plaza path
       enemies: [
-        { type: "slime", x: 6 * T + 8, y: 11 * T + 8, slow: true },
+        { type: "slime", x: 19 * T + 8, y: 13 * T + 8, slow: true },
       ],
       signs: [],
       props: [

@@ -267,7 +267,7 @@
     questOn = false;
     bestEnding = false;
     enterRoom("village", null, null, true);
-    player.spawnProt = 4000;
+    player.spawnProt = 5000;
     mode = MODE.PLAY;
     save();
   }
@@ -331,7 +331,7 @@
     const spawnInvuln = 3000;
     if (e.type === "slime") {
       return {
-        type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: e.slow ? 18 : 40,
+        type: "slime", hp: 1, maxHp: 1, dmg: 1, speed: e.slow ? 18 : 40,
         x: e.x, y: e.y, flash: 0, squash: 0, stun: 0, dead: false,
         knock: { x: 0, y: 0 }, spawnInvuln,
       };
@@ -498,9 +498,11 @@
       player.knock.y = (dy / len) * 26;
     }
     if (player.hp <= 0) {
+      // Keep empty hearts while DEAD so HUD never pairs full HP with death copy
+      player.hp = 0;
       mode = MODE.DEAD;
-      toast = null;
       dialog = null;
+      showToast("眼前一黑……");
       if (deathTimer) clearTimeout(deathTimer);
       deathTimer = setTimeout(() => { deathTimer = 0; respawnVillage(); }, 700);
     }
@@ -508,14 +510,15 @@
 
   function respawnVillage() {
     clearFadeAndDead();
-    player.hp = player.maxHp;
     player.iframe = 0;
     player.knock.x = player.knock.y = 0;
     // Auto-respawn — no E-to-dismiss death dialog (avoids stuck dead UI)
     enterRoom("village", Maps.ROOMS.village.spawn.x, Maps.ROOMS.village.spawn.y);
     player.spawnProt = 4000;
+    // Refill only when leaving DEAD → PLAY (soft toast, not death line)
     mode = MODE.PLAY;
-    showToast("眼前一黑……再试一次。");
+    player.hp = player.maxHp;
+    showToast("已回村");
     save();
   }
 
@@ -896,7 +899,7 @@
       if (e.summonWarn <= 0) {
         e.summonWarn = 0;
         enemies.push({
-          type: "slime", hp: 1, maxHp: 1, dmg: 0.5, speed: 40,
+          type: "slime", hp: 1, maxHp: 1, dmg: 1, speed: 40,
           x: e.summonX, y: e.summonY, flash: 0, squash: 0, stun: 0, dead: false,
           knock: { x: 0, y: 0 }, spawnInvuln: 500,
         });
