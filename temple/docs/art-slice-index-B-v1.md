@@ -80,10 +80,10 @@ function punyRect(row, col) {
 | V_FLOWER | 小花 | 2 | 装饰 |
 | V_TREE | 树（挡） | 4 或 5 | 碰撞实心 |
 | V_BUSH | 灌木（挡） | 6–8 | 碰撞 |
-| V_PATH | 土路 | 12–14 一带 | 以 numbered 表为准，选直道 |
-| V_HOUSE_WALL | 屋墙 | 60–67 / 72–79 | 拼外观 |
-| V_ROOF | 屋顶 | 48–55 或红顶段 | 高遮挡层 |
-| V_DOOR | 门 | 84–91 | 装饰/进殿口可用城堡门 |
+| V_PATH | 土路中填 | **25**（纯土）；边可用 24/26 | **禁**大面积平铺 12（角/边，填满会碎） |
+| V_HOUSE_WALL | 屋墙 | **72 / 74** | 禁 60+（图标板感） |
+| V_ROOF | 屋顶 | **48, 49, 50** | 左/中/右 |
+| V_DOOR | 门 | **85** | 房子门；禁墙用 60+ |
 | V_WELL | 井 | ~92 | 装饰挡 |
 | V_SIGN | 路牌 | ~126 | |
 | V_CHEST_C | 心箱关 | 130 | 村 +1 MaxHP |
@@ -104,7 +104,7 @@ function punyRect(row, col) {
 | D_DOOR_LOCK | 锁门（先见） | 9 或关着的木门 33–35 | 北门 |
 | D_DOOR_OPEN | 开门 | 10 或 45–47 | 开关后 |
 | D_CHEST_C/O | 宝箱 | 89 一带 / 开态 | Boss 钥箱 |
-| D_HEART | 心拾取 | 药水红瓶 ~113–116 或 Town 心用 UI | 优先红心感 |
+| D_HEART | 心拾取 / HUD | **115** 红药代理 | **禁 114**（绿药） |
 | D_STAIRS | 阶 | 54–55 | 可选 |
 | D_NPC_ELDER | 静态 NPC 备 | **84**（或 111） | 紫帽长老；**禁止** Warrior-Blue |
 | D_NPC_MERCH | 商人备 | **86** | |
@@ -123,7 +123,7 @@ function punyRect(row, col) {
 | `drawHero` 矢量豆 | `drawImage(Warrior-Blue, punyRect(dirRow, col), dx,dy,16,16)` |
 | `drawTile` 色块 | `drawImage(town\|dungeon packed, tileRect(id), …)` |
 | `drawSwitch` | `D_SWITCH_OFF/ON`（id 7/8） |
-| `drawHeartPickup` | 殿道具红瓶或 Town 心形；逻辑仍 8×8 拾取盒 |
+| `drawHeartPickup` / HUD 心 | 殿图 **115** 红药；逻辑仍 8×8 拾取盒 |
 | `drawSlime` | Puny `Slime.png` 帧循环 |
 | `drawBoss` | Dungeon **109 独眼巨人** + 缩放 2× + P2 红闪 |
 | `drawDialog/HUD` | 可用 Kenney UI 色块或纯 Canvas 字；心槽用红心 tile |
@@ -148,3 +148,15 @@ function punyRect(row, col) {
 - 未写入本表的随机 itch 包
 
 文件：`/workspace/chen-guang-feiyue/docs/art-slice-index-B-v1.md`
+
+---
+
+## 6. 手感片勘误（art 钉死）
+
+| 项 | 正确 | 禁止 |
+|----|------|------|
+| packed 步距 | `GAP=0` `STRIDE=16` | `GAP=1` / `STRIDE=17`（会撕瓦） |
+| 村路中填 | Town **25** | 大面积 **12** |
+| 房子 | 顶 48/49/50 · 墙 72/74 · 门 **85** | 墙用 **60+** |
+| HUD/地上心 | 殿 **115** | 殿 **114** 绿药 |
+| 标题有存档 | Continue 与 help/credits **纵向堆叠留空** | Continue 盖住操作说明 |

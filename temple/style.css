@@ -58,7 +58,8 @@ html, body {
   flex-direction: column;
   align-items: center;
   pointer-events: none;
-  padding: calc(var(--ui-scale, 1) * 10px) calc(var(--ui-scale, 1) * 8px) calc(var(--ui-scale, 1) * 8px);
+  padding: calc(var(--ui-scale, 1) * 8px) calc(var(--ui-scale, 1) * 8px) calc(var(--ui-scale, 1) * 6px);
+  justify-content: center;
 }
 .ui-title-name {
   margin-top: calc(var(--ui-scale, 1) * 8px);
@@ -99,12 +100,13 @@ html, body {
 }
 .ui-btn:active { background: #E76F51; }
 .ui-title-footer {
-  margin-top: auto;
+  /* stack directly under buttons — never margin-top:auto (Continue must not cover help) */
+  margin-top: calc(var(--ui-scale, 1) * 12px);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: calc(var(--ui-scale, 1) * 5px);
-  padding-top: calc(var(--ui-scale, 1) * 10px);
+  padding-top: 0;
   flex-shrink: 0;
 }
 .ui-title-hint {

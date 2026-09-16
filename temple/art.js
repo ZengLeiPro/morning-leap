@@ -14,7 +14,7 @@
   const TOWN_MAP = {
     0: 0,   // empty → grass fallback
     1: 0,   // grass
-    2: 12,  // path
+    2: 25,  // path center dirt (Kenney 25; avoid 12 edge shred)
     3: 0,   // (unused outdoors)
     4: 4,   // wall → tree solid look
     5: 5,   // alt tree
@@ -331,8 +331,8 @@
     noSmooth(ctx);
     const bob = Math.sin((time || 0) * 0.008) * 2;
     if (imgs.dungeon) {
-      // red potion-ish ~113–116
-      blitTile(ctx, imgs.dungeon, 114, Math.round(x - 8), Math.round(y - 8 + bob));
+      // red potion HP proxy (115); 114 is green — do not use
+      blitTile(ctx, imgs.dungeon, 115, Math.round(x - 8), Math.round(y - 8 + bob));
     } else {
       ctx.fillStyle = "#E76F51";
       ctx.fillRect(x - 4, y - 4 + bob, 8, 8);
@@ -365,15 +365,21 @@
       ctx.fillRect(x, y, w, h);
       return;
     }
-    // simple 3×2 tile house from wall/roof segments
+    // roof 48/49/50 · walls 72/74 · door 85 (never wall 60+ → icon board)
     const tw = Math.max(2, Math.round(w / 16));
     const th = Math.max(2, Math.round(h / 16));
     for (let j = 0; j < th; j++) {
       for (let i = 0; i < tw; i++) {
         let kid;
-        if (j === 0) kid = 48 + (i % 4); // roof
-        else if (j === th - 1 && i === (tw / 2) | 0) kid = 84; // door
-        else kid = 60 + (i % 4); // wall
+        if (j === 0) {
+          if (i === 0) kid = 48;
+          else if (i === tw - 1) kid = 50;
+          else kid = 49;
+        } else if (j === th - 1 && i === ((tw / 2) | 0)) {
+          kid = 85; // door
+        } else {
+          kid = (i % 2 === 0) ? 72 : 74; // wall
+        }
         blitTile(ctx, imgs.town, kid, x + i * 16, y + j * 16);
       }
     }
@@ -402,7 +408,7 @@
       const hy = 4;
       if (imgs.dungeon) {
         ctx.globalAlpha = filled ? 1 : 0.35;
-        blitTile(ctx, imgs.dungeon, 114, hx - 4, hy - 2);
+        blitTile(ctx, imgs.dungeon, 115, hx - 4, hy - 2);
         ctx.globalAlpha = 1;
         if (!filled) {
           ctx.fillStyle = "rgba(42,31,26,0.5)";
