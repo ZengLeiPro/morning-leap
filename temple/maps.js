@@ -203,7 +203,7 @@
     ],
     enemies: [{ type: "slime", x: 9 * T + 8, y: 5 * T + 8, slow: true }],
     signs: [
-      { x: 5 * T + 8, y: 4 * T + 8, text: "钥开残阳。", story: "stele" },
+      { x: 5 * T + 8, y: 4 * T + 8, text: "残阳沉睡之处。", story: "stele" },
     ],
   });
 
